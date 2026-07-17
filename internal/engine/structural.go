@@ -289,7 +289,7 @@ func mapRefs(expr tsvt.Expr, f func(tsvt.Reference) tsvt.Expr) tsvt.Expr {
 	case tsvt.Binary:
 		return tsvt.Binary{Op: e.Op, Left: mapRefs(e.Left, f), Right: mapRefs(e.Right, f)}
 	case tsvt.Call:
-		return tsvt.Call{Name: e.Name, Args: mapArgs(e.Args, f)}
+		return tsvt.Call{Name: e.Name, Args: mapArgs(e.Args, f), IsPiped: e.IsPiped}
 	default:
 		return expr
 	}

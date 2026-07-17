@@ -26,6 +26,12 @@ func (s *BaseTsvsheetParserListener) EnterErrorExpr(ctx *ErrorExprContext) {}
 // ExitErrorExpr is called when production errorExpr is exited.
 func (s *BaseTsvsheetParserListener) ExitErrorExpr(ctx *ErrorExprContext) {}
 
+// EnterPipeExpr is called when production pipeExpr is entered.
+func (s *BaseTsvsheetParserListener) EnterPipeExpr(ctx *PipeExprContext) {}
+
+// ExitPipeExpr is called when production pipeExpr is exited.
+func (s *BaseTsvsheetParserListener) ExitPipeExpr(ctx *PipeExprContext) {}
+
 // EnterNumberExpr is called when production numberExpr is entered.
 func (s *BaseTsvsheetParserListener) EnterNumberExpr(ctx *NumberExprContext) {}
 

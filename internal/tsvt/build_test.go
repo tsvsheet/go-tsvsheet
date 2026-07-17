@@ -112,6 +112,77 @@ func TestBuild_Call(t *testing.T) {
 	assert.Equal(t, "log10", parse(t, "log10(100)").(tsvt.Call).Name)
 }
 
+func TestBuild_Pipe(t *testing.T) {
+	t.Parallel()
+	// `x | f(a…)` desugars to `f(x, a…)` with the spelling flag set (§5.4).
+	want := tsvt.Call{
+		Name: "round",
+		Args: []tsvt.Expr{
+			tsvt.RefOperand{Ref: tsvt.RangeRef{From: tsvt.CellRef{Col: "A", Row: 1}}},
+			tsvt.Number{Text: "2"},
+		},
+		IsPiped: true,
+	}
+	assert.Equal(t, want, parse(t, "A1 | round(2)"))
+}
+
+func TestBuild_PipeIsTheComposedCall(t *testing.T) {
+	t.Parallel()
+	// The two spellings are the same formula: identical calls but for the flag.
+	piped := parse(t, "A1 | round(2)").(tsvt.Call)
+	piped.IsPiped = false
+	assert.Equal(t, parse(t, "round(A1, 2)"), piped)
+}
+
+func TestBuild_PipeChainFoldsLeft(t *testing.T) {
+	t.Parallel()
+	// x | f() | g() ≡ g(f(x)).
+	outer := parse(t, "A1 | trim() | len()").(tsvt.Call)
+	assert.Equal(t, "len", outer.Name)
+	require.Len(t, outer.Args, 1)
+	inner := outer.Args[0].(tsvt.Call)
+	assert.Equal(t, "trim", inner.Name)
+	assert.True(t, inner.IsPiped)
+}
+
+func TestBuild_PipeBindsLoosest(t *testing.T) {
+	t.Parallel()
+	// The entire preceding expression is the piped value: A1 & B1 | len() ≡ len(A1 & B1).
+	call := parse(t, "A1 & B1 | len()").(tsvt.Call)
+	assert.Equal(t, "len", call.Name)
+	require.Len(t, call.Args, 1)
+	assert.Equal(t, tsvt.OpCat, call.Args[0].(tsvt.Binary).Op)
+}
+
+func TestBuild_PipeSyntaxErrors(t *testing.T) {
+	t.Parallel()
+	// The right-hand side must be a §5.3 call, parentheses included; a bare
+	// name, a missing stage, a non-call stage, or a leading pipe is a syntax
+	// error by construction.
+	for _, src := range []string{"A1 |", "A1 | len", "A1 | 5", "A1 | (len())", "| len()"} {
+		t.Run(src, func(t *testing.T) {
+			t.Parallel()
+			_, err := tsvt.ParseFormula(tsvt.FormulaText(src))
+			require.Error(t, err)
+			assert.ErrorIs(t, err, constants.ErrSyntax)
+		})
+	}
+}
+
+func TestBuild_PipeOperandErrors(t *testing.T) {
+	t.Parallel()
+	// A bad reference surfaces through both pipe builder paths: the piped
+	// value and a stage's own argument.
+	for _, src := range []string{"B2.5 | len()", "A1 | round(B2.5)"} {
+		t.Run(src, func(t *testing.T) {
+			t.Parallel()
+			_, err := tsvt.ParseFormula(tsvt.FormulaText(src))
+			require.Error(t, err)
+			assert.ErrorIs(t, err, constants.ErrSyntax)
+		})
+	}
+}
+
 func TestBuild_FractionalRowRejected(t *testing.T) {
 	t.Parallel()
 	// A fractional A1 row is a syntax error; assert it surfaces through every

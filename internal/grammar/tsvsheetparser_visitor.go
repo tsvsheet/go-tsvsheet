@@ -10,6 +10,9 @@ type TsvsheetParserVisitor interface {
 	// Visit a parse tree produced by TsvsheetParser#errorExpr.
 	VisitErrorExpr(ctx *ErrorExprContext) interface{}
 
+	// Visit a parse tree produced by TsvsheetParser#pipeExpr.
+	VisitPipeExpr(ctx *PipeExprContext) interface{}
+
 	// Visit a parse tree produced by TsvsheetParser#numberExpr.
 	VisitNumberExpr(ctx *NumberExprContext) interface{}
 

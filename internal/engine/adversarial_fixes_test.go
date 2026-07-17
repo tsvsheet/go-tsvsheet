@@ -79,18 +79,21 @@ func TestRender_PrecedenceRoundTrips(t *testing.T) {
 	// A1=2 B1=3 C1=4; each formula in D1 must recompute identically after its
 	// rendered form is parsed back.
 	cases := map[string]string{
-		"=(A1 + B1) * C1": "20",    // parens preserved (would be 14 without)
-		"=A1 + B1 * C1":   "14",    // no parens added where unneeded
-		"=A1 - (B1 - C1)": "3",     // right operand of a left-assoc op
-		"=A1 - B1 - C1":   "-5",    // left-assoc chain needs no parens
-		"=C1 / (A1 / B1)": "6",     // wrapped right operand of division
-		"=-(A1 + B1)":     "-5",    // unary over a looser operand
-		"=-A1 + B1":       "1",     // unary over an atom needs no parens
-		"=(A1 + B1)%":     "0.05",  // percent over a looser operand
-		"=(2 ^ 3) ^ 2":    "64",    // left operand of right-assoc ^
-		"=2 ^ 3 ^ 2":      "512",   // right-assoc needs no parens
-		"=A1 = B1":        "FALSE", // comparison round-trips
-		"=A1 & (B1 & C1)": "234",   // right operand of concatenation
+		"=(A1 + B1) * C1":     "20",    // parens preserved (would be 14 without)
+		"=A1 + B1 * C1":       "14",    // no parens added where unneeded
+		"=A1 - (B1 - C1)":     "3",     // right operand of a left-assoc op
+		"=A1 - B1 - C1":       "-5",    // left-assoc chain needs no parens
+		"=C1 / (A1 / B1)":     "6",     // wrapped right operand of division
+		"=-(A1 + B1)":         "-5",    // unary over a looser operand
+		"=-A1 + B1":           "1",     // unary over an atom needs no parens
+		"=(A1 + B1)%":         "0.05",  // percent over a looser operand
+		"=(2 ^ 3) ^ 2":        "64",    // left operand of right-assoc ^
+		"=2 ^ 3 ^ 2":          "512",   // right-assoc needs no parens
+		"=A1 = B1":            "FALSE", // comparison round-trips
+		"=A1 & (B1 & C1)":     "234",   // right operand of concatenation
+		"=A1 | round(0)":      "2",     // pipe spelling round-trips (§5.4)
+		"=A1 + B1 | round(0)": "5",     // pipe binds loosest: round(A1 + B1, 0)
+		"=(A1 | len()) + B1":  "4",     // operator over a piped call keeps its parens
 	}
 	for formula, want := range cases {
 		t.Run(formula, func(t *testing.T) {

@@ -139,6 +139,14 @@ func TestExplain_RendersEveryExpressionForm(t *testing.T) {
 		"=abs(A1)":         "abs(A1)",
 		`="other.tsvt"!A1`: `"other.tsvt"!A1`, // cross-sheet single cell
 		`="d.tsvt"!A1:B2`:  `"d.tsvt"!A1:B2`,  // cross-sheet range
+		// The pipe spelling is preserved (§5.4): a piped call renders as the
+		// author's pipe, a chain stays a chain, and an operator capturing a
+		// piped call parenthesizes it.
+		"=A1 | len()":            "A1 | len()",
+		"=A1 | round(2)":         "A1 | round(2)",
+		"=A1 | trim() | len()":   "A1 | trim() | len()",
+		"=(A1 | len()) + 1":      "(A1 | len()) + 1",
+		"=sum(A1 | round(2), 1)": "sum(A1 | round(2),1)", // piped call as an argument needs no parens
 	}
 	for src, want := range cases {
 		t.Run(src, func(t *testing.T) {

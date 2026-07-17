@@ -25,6 +25,8 @@ func buildExpr(ctx grammar.IExpressionContext) (Expr, error) {
 		return buildBinary(OpCat, c.AllExpression())
 	case *grammar.CompareExprContext:
 		return buildBinary(BinaryOp(c.GetOp().GetText()), c.AllExpression())
+	case *grammar.PipeExprContext:
+		return buildPipe(c)
 	case *grammar.CallExprContext:
 		return buildCall(c.FunctionCall())
 	case *grammar.RefExprContext:
@@ -90,6 +92,23 @@ func buildRefOperand(ctx *grammar.RefExprContext) (Expr, error) {
 		return nil, err
 	}
 	return RefOperand{Ref: ref}, nil
+}
+
+// buildPipe desugars `x | f(a…)` into the call `f(x, a…)` (SPECIFICATION §5.4):
+// the piped expression is prepended as the call's first argument, and IsPiped
+// records the source spelling for rendering. Evaluation never sees a pipe —
+// the pipe IS this call.
+func buildPipe(ctx *grammar.PipeExprContext) (Expr, error) {
+	lhs, err := buildExpr(ctx.Expression())
+	if err != nil {
+		return nil, err
+	}
+	call := ctx.FunctionCall()
+	args, err := buildArgs(call.ArgList())
+	if err != nil {
+		return nil, err
+	}
+	return Call{Name: callName(call), Args: append([]Expr{lhs}, args...), IsPiped: true}, nil
 }
 
 // buildCall builds a function call, evaluating its argument expressions.

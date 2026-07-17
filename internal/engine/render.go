@@ -35,12 +35,13 @@ func renderExpr(expr tsvt.Expr) string {
 // precedence ranks a rendered expression by how tightly it binds; a higher rank
 // binds tighter, so a sub-expression needs parentheses when it binds looser than
 // its context. The ranks mirror the grammar: a postfix % binds tightest, then ^,
-// unary sign, * /, + -, & concatenation, and comparisons loosest; atoms
-// (literals, refs, calls) never need parentheses.
+// unary sign, * /, + -, & concatenation, comparisons, and the pipe loosest of
+// all; atoms (literals, refs, un-piped calls) never need parentheses.
 type precedence int
 
 const (
-	precCompare precedence = iota + 1
+	precPipe precedence = iota + 1
+	precCompare
 	precCat
 	precAdd
 	precMul
@@ -50,7 +51,9 @@ const (
 	precAtom
 )
 
-// exprPrec is the binding rank of an expression's top node.
+// exprPrec is the binding rank of an expression's top node. A call rendered in
+// its pipe spelling (§5.4) ranks loosest, so it is parenthesized wherever an
+// operator would otherwise capture its final call: `(A1 | len()) + 1`.
 func exprPrec(expr tsvt.Expr) precedence {
 	switch e := expr.(type) {
 	case tsvt.Binary:
@@ -59,9 +62,20 @@ func exprPrec(expr tsvt.Expr) precedence {
 		return precUnary
 	case tsvt.Percent:
 		return precPercent
+	case tsvt.Call:
+		return callPrec(e)
 	default:
 		return precAtom
 	}
+}
+
+// callPrec is the binding rank of a call: an atom in its plain spelling, the
+// loosest rank in its pipe spelling.
+func callPrec(call tsvt.Call) precedence {
+	if call.IsPiped {
+		return precPipe
+	}
+	return precAtom
 }
 
 // binaryPrec is the binding rank of a binary operator.
@@ -121,13 +135,22 @@ func renderBool(isTrue boolResult) string {
 	return "FALSE"
 }
 
-// renderCall reconstructs a function call.
+// renderCall reconstructs a function call in the author's spelling: plain
+// `f(x, a)`, or the pipe form `x | f(a)` it desugared from (§5.4).
 func renderCall(call tsvt.Call) string {
-	args := make([]string, len(call.Args))
-	for i, arg := range call.Args {
+	if call.IsPiped {
+		return renderExpr(call.Args[0]) + " | " + call.Name + "(" + joinArgs(call.Args[1:]) + ")"
+	}
+	return call.Name + "(" + joinArgs(call.Args) + ")"
+}
+
+// joinArgs renders a comma-joined argument list.
+func joinArgs(exprs []tsvt.Expr) string {
+	args := make([]string, len(exprs))
+	for i, arg := range exprs {
 		args[i] = renderExpr(arg)
 	}
-	return call.Name + "(" + strings.Join(args, ",") + ")"
+	return strings.Join(args, ",")
 }
 
 // renderReference reconstructs an A1 reference: a cell or a two-cell range,

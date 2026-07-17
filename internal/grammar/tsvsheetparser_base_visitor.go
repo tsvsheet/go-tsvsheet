@@ -11,6 +11,10 @@ func (v *BaseTsvsheetParserVisitor) VisitErrorExpr(ctx *ErrorExprContext) interf
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseTsvsheetParserVisitor) VisitPipeExpr(ctx *PipeExprContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseTsvsheetParserVisitor) VisitNumberExpr(ctx *NumberExprContext) interface{} {
 	return v.VisitChildren(ctx)
 }

@@ -69,11 +69,17 @@ type Percent struct {
 }
 
 // Call is a function call; Name is case-preserved (identity resolves
-// case-insensitively in the evaluator).
+// case-insensitively in the evaluator). IsPiped records that the source
+// spelled this call with the pipe operator (SPECIFICATION §5.4): `x | f(a)`
+// desugars at build to `f(x, a)` with IsPiped set, so evaluation only ever
+// sees function application and the flag exists solely so rendering can
+// preserve the author's spelling. The desugar always prepends the piped value,
+// so a piped call has at least one argument.
 type Call struct {
 	exprMarker
-	Name string
-	Args []Expr
+	Name    string
+	Args    []Expr
+	IsPiped bool
 }
 
 // RefOperand is an A1 reference used as an expression operand.

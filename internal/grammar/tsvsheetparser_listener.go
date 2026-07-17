@@ -10,6 +10,9 @@ type TsvsheetParserListener interface {
 	// EnterErrorExpr is called when entering the errorExpr production.
 	EnterErrorExpr(c *ErrorExprContext)
 
+	// EnterPipeExpr is called when entering the pipeExpr production.
+	EnterPipeExpr(c *PipeExprContext)
+
 	// EnterNumberExpr is called when entering the numberExpr production.
 	EnterNumberExpr(c *NumberExprContext)
 
@@ -66,6 +69,9 @@ type TsvsheetParserListener interface {
 
 	// ExitErrorExpr is called when exiting the errorExpr production.
 	ExitErrorExpr(c *ErrorExprContext)
+
+	// ExitPipeExpr is called when exiting the pipeExpr production.
+	ExitPipeExpr(c *PipeExprContext)
 
 	// ExitNumberExpr is called when exiting the numberExpr production.
 	ExitNumberExpr(c *NumberExprContext)
