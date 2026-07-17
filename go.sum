@@ -14,8 +14,8 @@ github.com/rogpeppe/go-internal v1.14.1 h1:UQB4HGPB6osV0SQTLymcB4TgvyWu6ZyliaW0t
 github.com/rogpeppe/go-internal v1.14.1/go.mod h1:MaRKkUm5W0goXpeCfT7UZI6fk/L7L7so1lCWt35ZSgc=
 github.com/stretchr/testify v1.11.1 h1:7s2iGBzp5EwR7/aIZr8ao5+dra3wiQyKjjFuvgVKu7U=
 github.com/stretchr/testify v1.11.1/go.mod h1:wZwfW3scLgRK+23gO65QZefKpKQRnfz6sD981Nm4B6U=
-github.com/tsvsheet/isnow.go v0.6.10 h1:OpWSX2/6Jz4l57bmpBt/d637xmagF6eOYO+cMIsrLGw=
-github.com/tsvsheet/isnow.go v0.6.10/go.mod h1:cAwyGBCXxcSHO3+yrO/ottWThpOF0TrFzTnbmM8FtGQ=
+github.com/tsvsheet/go-isnow v0.1.0 h1:iWSx+JFHHUCEO7bRCkEke9wGsz7zXzGz4h7lid0wnts=
+github.com/tsvsheet/go-isnow v0.1.0/go.mod h1:fJ/wl9MOL1NFhM0hxos9BKj/WLKqQ5wZ4e/tm1UObfs=
 golang.org/x/exp v0.0.0-20240506185415-9bf2ced13842 h1:vr/HnozRka3pE4EsMEg1lgkXJkTFJCVUX+S/ZT6wYzM=
 golang.org/x/exp v0.0.0-20240506185415-9bf2ced13842/go.mod h1:XtvwrStGgqGPLc4cjQfWqZHG1YFdYs6swckp8vpsjnc=
 gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=

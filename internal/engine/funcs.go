@@ -4,7 +4,7 @@ import (
 	"math"
 	"strings"
 
-	isnow "github.com/tsvsheet/isnow.go"
+	isnow "github.com/tsvsheet/go-isnow"
 
 	"github.com/tsvsheet/go-tsvsheet/internal/tsvt"
 )
@@ -191,7 +191,7 @@ func (r resolver) evalIsnow(args []tsvt.Expr) Value {
 	if pattern.isError() {
 		return pattern
 	}
-	holds, err := isnow.Is(pattern.String(), r.comp.now)
+	holds, err := isnow.Is(isnow.PatternText(pattern.String()), r.comp.now)
 	if err != nil {
 		return errorValue(ErrValue)
 	}

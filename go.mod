@@ -6,7 +6,7 @@ require (
 	github.com/antlr4-go/antlr/v4 v4.13.1
 	github.com/gomatic/go-error v0.3.4
 	github.com/stretchr/testify v1.11.1
-	github.com/tsvsheet/isnow.go v0.6.10
+	github.com/tsvsheet/go-isnow v0.1.0
 )
 
 require (
