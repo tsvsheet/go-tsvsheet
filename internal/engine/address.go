@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/uplang/go-tsvsheet/internal/constants"
+	"github.com/tsvsheet/go-tsvsheet/internal/constants"
 )
 
 // AddressText is spreadsheet-address source text (`A1`, `F4`) accepted by

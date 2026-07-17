@@ -1,6 +1,6 @@
 package engine
 
-import "github.com/uplang/go-tsvsheet/internal/tsvt"
+import "github.com/tsvsheet/go-tsvsheet/internal/tsvt"
 
 // evalTable dispatches the lookup builtins, which need their range argument's
 // rows×columns shape. ok is false for any other name.

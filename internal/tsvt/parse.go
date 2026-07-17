@@ -3,7 +3,7 @@ package tsvt
 import (
 	"github.com/antlr4-go/antlr/v4"
 
-	"github.com/uplang/go-tsvsheet/internal/constants"
+	"github.com/tsvsheet/go-tsvsheet/internal/constants"
 )
 
 // errorSink holds the first collected syntax error so an errorCollector can

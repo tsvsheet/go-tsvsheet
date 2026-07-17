@@ -6,8 +6,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	tsvsheet "github.com/uplang/go-tsvsheet"
-	"github.com/uplang/go-tsvsheet/internal/constants"
+	tsvsheet "github.com/tsvsheet/go-tsvsheet"
+	"github.com/tsvsheet/go-tsvsheet/internal/constants"
 )
 
 // TestReExportedSentinels verifies the root package re-exports the engine's

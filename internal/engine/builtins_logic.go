@@ -1,6 +1,6 @@
 package engine
 
-import "github.com/uplang/go-tsvsheet/internal/tsvt"
+import "github.com/tsvsheet/go-tsvsheet/internal/tsvt"
 
 // evalIfs evaluates IFS(cond1, val1, …): the value of the first truthy
 // condition. A non-paired argument count is #VALUE!; no truthy condition is

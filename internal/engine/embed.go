@@ -4,7 +4,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/uplang/go-tsvsheet/internal/tsvt"
+	"github.com/tsvsheet/go-tsvsheet/internal/tsvt"
 )
 
 // Path identifies a sheet to a Loader: the reference written in a

@@ -1,6 +1,6 @@
 package engine
 
-import "github.com/uplang/go-tsvsheet/internal/tsvt"
+import "github.com/tsvsheet/go-tsvsheet/internal/tsvt"
 
 // foreignStatus is the outcome of resolving a `"file"!` reference's target sheet.
 type foreignStatus int

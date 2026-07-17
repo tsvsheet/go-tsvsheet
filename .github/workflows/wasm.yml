@@ -16,7 +16,7 @@ concurrency:
 # public proxy, matching go.sum and the rest of the org's CI — the plain proxy
 # serves a different (older) blob for a re-tagged dependency.
 env:
-  GOPRIVATE: github.com/gomatic/*,github.com/nicerobot/*,github.com/gloo-foo/*,github.com/sqlrest/*,github.com/uplang/*,github.com/skykernel/*,github.com/xto-email/*
+  GOPRIVATE: github.com/gomatic/*,github.com/nicerobot/*,github.com/gloo-foo/*,github.com/sqlrest/*,github.com/uplang/*,github.com/tsvsheet/*,github.com/skykernel/*,github.com/xto-email/*
 jobs:
   wasm:
     runs-on: ubuntu-latest

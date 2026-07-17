@@ -1,6 +1,6 @@
 package engine
 
-import "github.com/uplang/go-tsvsheet/internal/tsvt"
+import "github.com/tsvsheet/go-tsvsheet/internal/tsvt"
 
 // Span is a rectangular reference target resolved to 0-based addresses: a single
 // cell (From == To) or a range (From is the top-left, To the bottom-right as

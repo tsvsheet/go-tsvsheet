@@ -3,7 +3,7 @@ package engine
 import (
 	"strings"
 
-	"github.com/uplang/go-tsvsheet/internal/tsvt"
+	"github.com/tsvsheet/go-tsvsheet/internal/tsvt"
 )
 
 // Diagnostic is an advisory finding about a formula cell: currently an unknown

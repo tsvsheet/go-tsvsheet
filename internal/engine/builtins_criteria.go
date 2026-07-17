@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/uplang/go-tsvsheet/internal/tsvt"
+	"github.com/tsvsheet/go-tsvsheet/internal/tsvt"
 )
 
 // evalCriteria dispatches the conditional-aggregate builtins, which pair a range

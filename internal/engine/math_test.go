@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/uplang/go-tsvsheet/internal/engine"
+	"github.com/tsvsheet/go-tsvsheet/internal/engine"
 )
 
 // num formats a float as tsvsheet renders it.

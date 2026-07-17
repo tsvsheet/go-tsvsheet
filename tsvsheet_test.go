@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/uplang/go-tsvsheet"
+	"github.com/tsvsheet/go-tsvsheet"
 )
 
 // TestFacadeRoundTrip exercises every public wrapper the facade adds over

@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/uplang/go-tsvsheet/internal/engine"
+	"github.com/tsvsheet/go-tsvsheet/internal/engine"
 )
 
 // sourceAt reads the source text of the cell at a 0-based (row, col).

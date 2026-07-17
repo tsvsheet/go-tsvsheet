@@ -17,7 +17,7 @@ import (
 	"syscall/js"
 	"time"
 
-	tsvsheet "github.com/uplang/go-tsvsheet"
+	tsvsheet "github.com/tsvsheet/go-tsvsheet"
 )
 
 func main() {

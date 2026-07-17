@@ -4,8 +4,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/uplang/go-tsvsheet/internal/constants"
-	"github.com/uplang/go-tsvsheet/internal/tsvt"
+	"github.com/tsvsheet/go-tsvsheet/internal/constants"
+	"github.com/tsvsheet/go-tsvsheet/internal/tsvt"
 )
 
 // Trace explains how one cell was produced: its value, the formula (empty for a

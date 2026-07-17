@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/uplang/go-tsvsheet/internal/engine"
+	"github.com/tsvsheet/go-tsvsheet/internal/engine"
 )
 
 // lookup evaluates a formula against a 3x2 table in A1:B3 (names, scores); the

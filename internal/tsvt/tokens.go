@@ -5,7 +5,7 @@ import (
 
 	"github.com/antlr4-go/antlr/v4"
 
-	"github.com/uplang/go-tsvsheet/internal/constants"
+	"github.com/tsvsheet/go-tsvsheet/internal/constants"
 )
 
 // quoted is a double-quoted STRING token's raw text (quotes included).

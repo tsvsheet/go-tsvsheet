@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"strings"
 
-	"github.com/uplang/go-tsvsheet/internal/tsvt"
+	"github.com/tsvsheet/go-tsvsheet/internal/tsvt"
 )
 
 // MediaType is a content-typed import's RFC 6838 media type — the Accept header

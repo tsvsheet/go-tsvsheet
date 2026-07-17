@@ -1,6 +1,6 @@
 package tsvsheet
 
-import "github.com/uplang/go-tsvsheet/internal/constants"
+import "github.com/tsvsheet/go-tsvsheet/internal/constants"
 
 // Engine error sentinels returned to callers, matchable with errors.Is.
 const (

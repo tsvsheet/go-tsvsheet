@@ -1,6 +1,6 @@
 package engine
 
-import "github.com/uplang/go-tsvsheet/internal/tsvt"
+import "github.com/tsvsheet/go-tsvsheet/internal/tsvt"
 
 // eval evaluates a §11 expression to a Value; error values propagate strictly
 // (ADR 0003 rule 3), left operand first.

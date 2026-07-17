@@ -6,7 +6,7 @@
 // grid. The expression sublanguage and its AST come from internal/tsvt (the
 // ANTLR-generated parser); this package resolves A1 references and evaluates.
 //
-// This is the implementation behind the thin public github.com/uplang/go-tsvsheet
+// This is the implementation behind the thin public github.com/tsvsheet/go-tsvsheet
 // facade, which re-exports engine's surface unchanged; callers use that package.
 package engine
 
@@ -15,8 +15,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/uplang/go-tsvsheet/internal/constants"
-	"github.com/uplang/go-tsvsheet/internal/tsvt"
+	"github.com/tsvsheet/go-tsvsheet/internal/constants"
+	"github.com/tsvsheet/go-tsvsheet/internal/tsvt"
 )
 
 // cell is one spreadsheet cell: a verbatim literal, or a compiled formula.

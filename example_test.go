@@ -3,7 +3,7 @@ package tsvsheet_test
 import (
 	"fmt"
 
-	tsvsheet "github.com/uplang/go-tsvsheet"
+	tsvsheet "github.com/tsvsheet/go-tsvsheet"
 )
 
 // Parse compiles a .tsvt grid; Compute evaluates every =formula in dependency

@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/uplang/go-tsvsheet/internal/engine"
+	"github.com/tsvsheet/go-tsvsheet/internal/engine"
 )
 
 // errNoSheet is what the in-memory loader returns for an unknown reference.

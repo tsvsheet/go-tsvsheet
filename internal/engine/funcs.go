@@ -4,9 +4,9 @@ import (
 	"math"
 	"strings"
 
-	isnow "github.com/uplang/isnow.go"
+	isnow "github.com/tsvsheet/isnow.go"
 
-	"github.com/uplang/go-tsvsheet/internal/tsvt"
+	"github.com/tsvsheet/go-tsvsheet/internal/tsvt"
 )
 
 // mod is Excel's MOD remainder: it takes the sign of the divisor via floored
@@ -180,7 +180,7 @@ func (r resolver) evalClock(name funcName, args []tsvt.Expr) (Value, boolResult)
 	}
 }
 
-// evalIsnow tests whether an isnow date/time pattern (uplang/isnow) holds at the
+// evalIsnow tests whether an isnow date/time pattern (tsvsheet/isnow) holds at the
 // compute clock: ISNOW("M-F noon") is TRUE when the pattern matches the current
 // pass instant. A malformed pattern, or the wrong arity, is #VALUE!.
 func (r resolver) evalIsnow(args []tsvt.Expr) Value {

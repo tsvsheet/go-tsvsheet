@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/uplang/go-tsvsheet/internal/engine"
+	"github.com/tsvsheet/go-tsvsheet/internal/engine"
 )
 
 // isnowAt computes a single ISNOW formula against a fixed instant.

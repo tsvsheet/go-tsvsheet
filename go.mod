@@ -1,12 +1,12 @@
-module github.com/uplang/go-tsvsheet
+module github.com/tsvsheet/go-tsvsheet
 
 go 1.26.4
 
 require (
 	github.com/antlr4-go/antlr/v4 v4.13.1
-	github.com/gomatic/go-error v0.3.0
+	github.com/gomatic/go-error v0.3.4
 	github.com/stretchr/testify v1.11.1
-	github.com/uplang/isnow.go v0.6.0
+	github.com/tsvsheet/isnow.go v0.6.10
 )
 
 require (

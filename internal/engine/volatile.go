@@ -3,7 +3,7 @@ package engine
 import (
 	"strings"
 
-	"github.com/uplang/go-tsvsheet/internal/tsvt"
+	"github.com/tsvsheet/go-tsvsheet/internal/tsvt"
 )
 
 // IsVolatile reports whether any formula calls a clock-dependent function

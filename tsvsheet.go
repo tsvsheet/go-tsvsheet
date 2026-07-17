@@ -3,7 +3,7 @@ package tsvsheet
 import (
 	"io"
 
-	"github.com/uplang/go-tsvsheet/internal/engine"
+	"github.com/tsvsheet/go-tsvsheet/internal/engine"
 )
 
 // Address is a cell coordinate in spreadsheet notation (`F4`): column letters

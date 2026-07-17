@@ -4,7 +4,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/uplang/go-tsvsheet/internal/tsvt"
+	"github.com/tsvsheet/go-tsvsheet/internal/tsvt"
 )
 
 // evalArray dispatches the dynamic-array builtins, which produce a 2-D result

@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/uplang/go-tsvsheet/internal/tsvt"
+	"github.com/tsvsheet/go-tsvsheet/internal/tsvt"
 )
 
 // renderExpr reconstructs a readable source form of an expression, used by

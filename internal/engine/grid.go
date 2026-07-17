@@ -9,7 +9,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/uplang/go-tsvsheet/internal/constants"
+	"github.com/tsvsheet/go-tsvsheet/internal/constants"
 )
 
 // tab is the single field separator; newline terminates a row.

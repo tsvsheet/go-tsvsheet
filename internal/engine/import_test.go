@@ -8,8 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/uplang/go-tsvsheet/internal/constants"
-	"github.com/uplang/go-tsvsheet/internal/engine"
+	"github.com/tsvsheet/go-tsvsheet/internal/constants"
+	"github.com/tsvsheet/go-tsvsheet/internal/engine"
 )
 
 // The content-typed import media wire strings (ADR 0006 §2). Hardcoded here as
