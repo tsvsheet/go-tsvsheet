@@ -17,4 +17,5 @@ DIST := dist
 wasm: ## Build the engine WebAssembly (tsvsheet.wasm + runtime) into dist/
 	mkdir -p $(DIST)
 	GOOS=js GOARCH=wasm go build -ldflags="-s -w" -o $(DIST)/tsvsheet.wasm ./browser
-	cp "$$(go env GOROOT)/lib/wasm/wasm_exec.js" $(DIST)/wasm_exec.js
+	echo '// @generated — Go runtime glue copied verbatim from GOROOT/lib/wasm/wasm_exec.js; regenerate with make wasm, never edit.' > $(DIST)/wasm_exec.js
+	cat "$$(go env GOROOT)/lib/wasm/wasm_exec.js" >> $(DIST)/wasm_exec.js
