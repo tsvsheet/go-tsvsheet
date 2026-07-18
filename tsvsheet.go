@@ -31,6 +31,11 @@ type Diagnostic = engine.Diagnostic
 // propagates through expressions per ADR 0003 (rules 3, 8, 12, 14).
 type ErrorValue = engine.ErrorValue
 
+// Expr is one compiled bare expression — the text that would follow `=` in a
+// formula cell — detached from any sheet: compile once with CompileExpr, then
+// evaluate against any number of grids, including concurrently.
+type Expr = engine.Expr
+
 // FetchResult is a Fetcher's response: the raw body and the media type the
 // server declared, which must match the requested Accept for the handshake to
 // succeed (ADR 0006 §2).
@@ -148,3 +153,18 @@ func BrowserLimits() Limits { return engine.BrowserLimits() }
 // Explain computes the sheet and describes the cell at at: its value, and — when
 // the cell is a formula — that formula and each reference it reads.
 func Explain(s Sheet, at Address) (Trace, error) { return engine.Explain(s, at) }
+
+// CompileExpr parses and compiles one bare expression — the text that would
+// follow `=` in a formula cell. A malformed expression is ErrSyntax carrying
+// line/column detail via With. The compiled Expr is an immutable value, safe
+// for concurrent reuse; its Eval(g, opts) evaluates against a Grid with the
+// exact semantics of a formula cell in a sheet over that grid — reference
+// resolution, literal coercion, ranges, dynamic arrays, error-value
+// propagation, volatile functions from opts.At, Limits enforcement, and
+// Loader/Fetcher gating — returning error values, never Go errors.
+func CompileExpr(src []byte) (Expr, error) { return engine.CompileExpr(src) }
+
+// FormatValue is the canonical computed-cell text for v — byte-identical to
+// what WriteTSV emits for that value in a computed grid. A 2-D array value
+// reduces to its scalar-context (top-left) value before formatting.
+func FormatValue(v Value) string { return engine.FormatValue(v) }

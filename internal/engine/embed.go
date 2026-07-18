@@ -44,12 +44,21 @@ type ComputeOptions struct {
 // cells embed other sheets. The sheet's own Base path seeds cycle detection; the
 // injected Limits (or DefaultLimits when unset) bound every allocation.
 func (s Sheet) ComputeWith(opts ComputeOptions) Grid {
+	return s.computeGrid(passComputer(s, opts))
+}
+
+// passComputer builds the computer one compute pass uses over sheet s: the
+// embedding environment from opts (its Base seeding cycle detection), the
+// effective limits, and the injected fetcher. ComputeWith and Expr.Eval both
+// route through it, so a sheet pass and a bare-expression evaluation cannot
+// diverge.
+func passComputer(s Sheet, opts ComputeOptions) computer {
 	env := embedEnv{
 		loader:   opts.Loader,
 		base:     opts.Base,
 		visiting: map[Path]boolResult{opts.Base: true},
 	}
-	return s.computeGrid(newEmbedComputer(s, opts.At, env, effectiveLimits(opts.Limits), opts.Fetcher))
+	return newEmbedComputer(s, opts.At, env, effectiveLimits(opts.Limits), opts.Fetcher)
 }
 
 // newEmbedComputer is newComputer with an embedding environment, the injected

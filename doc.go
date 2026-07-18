@@ -7,7 +7,10 @@
 // Google-Sheets-faithful expression evaluator that carries error values
 // (#REF!, #DIV/0!, #CIRC!, …) through a dependency-ordered, memoized pass
 // (Compute, ComputeWith), and inspects the result (Check diagnostics, Explain
-// traces) before rendering it back to TSV (WriteTSV). Formula compilation
+// traces) before rendering it back to TSV (WriteTSV). A bare expression — the
+// text after a formula cell's `=` — also compiles standalone (CompileExpr) into
+// an immutable Expr that evaluates against any Grid with formula-cell semantics
+// (Expr.Eval) and formats canonically (FormatValue). Formula compilation
 // reuses the grammar repo's ANTLR-generated expression parser through the
 // internal/tsvt seam; no ANTLR type escapes into the public surface.
 //
