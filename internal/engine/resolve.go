@@ -171,12 +171,19 @@ func ordered(x, y gridPos) (gridPos, gridPos) {
 }
 
 // argMatrix resolves an argument to a 2-D block of values: a range keeps its
-// rows×columns shape (for lookups), any other expression is a 1×1 block.
+// rows×columns shape (for lookups), and an expression that evaluates to an
+// array contributes that shape — consumed exactly like a range, so
+// `index(sort(…), 2)` reads the sorted block (ADR 0004 §2 array-valued
+// arguments). Any other expression is a 1×1 block.
 func (r resolver) argMatrix(arg tsvt.Expr) [][]Value {
 	if ref, ok := arg.(tsvt.RefOperand); ok {
 		return r.rangeMatrix(ref.Ref)
 	}
-	return [][]Value{{r.eval(arg)}}
+	v := r.eval(arg)
+	if v.kind == kindArray {
+		return v.arr
+	}
+	return [][]Value{{v}}
 }
 
 // rangeMatrix resolves an A1 reference to its rows×columns of values; an

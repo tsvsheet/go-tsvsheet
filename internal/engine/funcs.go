@@ -320,13 +320,19 @@ func (r resolver) argValues(args []tsvt.Expr) []Value {
 }
 
 // argCells expands one argument: a bare reference contributes all its resolved
-// cells (so `sum(A:H)` sees the whole range); any other expression is one
-// scalar value.
+// cells (so `sum(A:H)` sees the whole range), and an expression that evaluates
+// to an array contributes its elements row-major — consumed exactly like a
+// range, so `sum(sort(A1:A3))` aggregates (ADR 0004 §2 array-valued
+// arguments). Any other expression is one scalar value.
 func (r resolver) argCells(arg tsvt.Expr) []Value {
 	if ref, ok := arg.(tsvt.RefOperand); ok {
 		return r.resolveOperand(ref.Ref).values
 	}
-	return []Value{r.eval(arg)}
+	v := r.eval(arg)
+	if v.kind == kindArray {
+		return flatten1D(v.arr)
+	}
+	return []Value{v}
 }
 
 // functions is the case-insensitive eager builtin registry (ADR 0004 §2); `if`

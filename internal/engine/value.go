@@ -159,6 +159,8 @@ func (v Value) truthy() (bool, Value) {
 		return v.num != 0, v
 	case kindString:
 		return v.str != "", v
+	case kindArray:
+		return v.arr[0][0].truthy()
 	default:
 		return false, v
 	}
