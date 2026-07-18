@@ -266,6 +266,104 @@ func TestImportWrongArity(t *testing.T) {
 	}
 }
 
+func TestImportAcceptHeaderNegotiates(t *testing.T) {
+	t.Parallel()
+
+	// The Accept helper advertises the vendor type preferred with the standard
+	// tabular types at descending quality — the header frontends must send.
+	assert.Equal(
+		t,
+		"application/vnd.tsvsheet.cell+tsv, text/tab-separated-values;q=0.9, text/csv;q=0.8",
+		mediaCellWire.Accept(),
+	)
+}
+
+func TestImportGenericTabularAccepted(t *testing.T) {
+	t.Parallel()
+
+	// The standard tabular types satisfy the handshake for every function, and
+	// parameters/case on the Content-Type never break it.
+	cases := map[string]struct {
+		src         string
+		contentType engine.MediaType
+		body        string
+		want        [][]string
+	}{
+		"tsv for importsheet": {
+			"=importsheet(\"u\")\n", "text/tab-separated-values", "1\t2\n3\t4\n",
+			[][]string{{"1", "2"}, {"3", "4"}},
+		},
+		"tsv with charset param": {
+			"=importcell(\"u\")\n", "text/tab-separated-values; charset=utf-8", "42\n",
+			[][]string{{"42"}},
+		},
+		"vendor with charset param": {
+			"=importcell(\"u\")\n", "application/vnd.tsvsheet.cell+tsv; charset=utf-8", "42\n",
+			[][]string{{"42"}},
+		},
+		"csv uppercase": {
+			"=importrow(\"u\")\n", "TEXT/CSV", "a,b,c\n",
+			[][]string{{"a", "b", "c"}},
+		},
+		"csv for importrange": {
+			"=importrange(\"u\")\n", "text/csv", "1,2\n3,4\n",
+			[][]string{{"1", "2"}, {"3", "4"}},
+		},
+		"csv quoted comma stays one cell": {
+			"=importcell(\"u\")\n", "text/csv", "\"a, b\"\n",
+			[][]string{{"a, b"}},
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			f := fixedFetcher{result: engine.FetchResult{Body: []byte(tc.body), ContentType: tc.contentType}}
+			grid := importGrid(t, tc.src, f, engine.DefaultLimits())
+			for r, row := range tc.want {
+				for c, want := range row {
+					assert.Equal(t, want, cellAt(t, grid, r, c))
+				}
+			}
+		})
+	}
+}
+
+func TestImportGenericTabularRefusals(t *testing.T) {
+	t.Parallel()
+
+	// Non-tabular types stay refused; a malformed csv body and a generic body
+	// failing the requested shape are #IMPORT! — never a salvage.
+	cases := map[string]struct {
+		src         string
+		contentType engine.MediaType
+		body        string
+	}{
+		"text/plain refused":     {"=importcell(\"u\")\n", "text/plain", "42\n"},
+		"text/html refused":      {"=importsheet(\"u\")\n", "text/html; charset=utf-8", "<table></table>\n"},
+		"json refused":           {"=importrange(\"u\")\n", "application/json", "[[1,2]]\n"},
+		"malformed csv":          {"=importcell(\"u\")\n", "text/csv", "\"a\n"},
+		"csv shape still strict": {"=importcell(\"u\")\n", "text/csv", "1,2\n"},
+		"tsv shape still strict": {"=importrow(\"u\")\n", "text/tab-separated-values", "a\nb\n"},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			f := fixedFetcher{result: engine.FetchResult{Body: []byte(tc.body), ContentType: tc.contentType}}
+			grid := importGrid(t, tc.src, f, engine.DefaultLimits())
+			assert.Equal(t, "#IMPORT!", cellAt(t, grid, 0, 0))
+		})
+	}
+}
+
+func TestImportCSVLeadingEqualsStaysLiteral(t *testing.T) {
+	t.Parallel()
+
+	// Values-only holds on the csv path too: a leading `=` is literal text.
+	f := fixedFetcher{result: engine.FetchResult{Body: []byte("=A1\n"), ContentType: "text/csv"}}
+	grid := importGrid(t, "=importcell(\"u\")\n", f, engine.DefaultLimits())
+	assert.Equal(t, "=A1", cellAt(t, grid, 0, 0))
+}
+
 func TestImportErrorValuedURLPropagates(t *testing.T) {
 	t.Parallel()
 

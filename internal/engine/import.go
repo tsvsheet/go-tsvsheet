@@ -2,8 +2,10 @@ package engine
 
 import (
 	"bytes"
+	"encoding/csv"
 	"strings"
 
+	"github.com/tsvsheet/go-tsvsheet/internal/constants"
 	"github.com/tsvsheet/go-tsvsheet/internal/tsvt"
 )
 
@@ -22,6 +24,22 @@ const (
 	mediaColumn MediaType = "application/vnd.tsvsheet.column+tsv"
 	mediaRange  MediaType = "application/vnd.tsvsheet.range+tsv"
 )
+
+// The standard tabular media types admitted alongside the vendor types (ADR
+// 0010 §1): an endpoint deliberately publishing TSV or CSV — a Google Sheets
+// export, a data portal, a CI artifact — speaks the tabular lingua franca
+// instead of the vendor protocol. Every other base type is refused.
+const (
+	mediaTSV MediaType = "text/tab-separated-values"
+	mediaCSV MediaType = "text/csv"
+)
+
+// Accept is the negotiation list an IMPORT* request sends for this vendor media
+// type: the vendor type preferred, the standard tabular types admitted with
+// descending quality (ADR 0010 §1). Frontends set it as the Accept header.
+func (m MediaType) Accept() string {
+	return string(m) + ", " + string(mediaTSV) + ";q=0.9, " + string(mediaCSV) + ";q=0.8"
+}
 
 // importMedia maps each lowercase import function name to the media type it
 // requests — the name is the content type (ADR 0006 §2).
@@ -97,8 +115,9 @@ func (r resolver) evalImport(name funcName, args []tsvt.Expr) (Value, boolResult
 
 // fetchImport fetches url and parses the response into the import's value. A nil
 // Fetcher (the plain Compute path, or a frontend that has not enabled imports)
-// disables imports; a fetch error or a Content-Type that does not match the
-// requested media type is #IMPORT! (ADR 0006 §2, §4).
+// disables imports; a fetch error or a Content-Type outside the accept set —
+// the requested vendor type or a standard tabular type — is #IMPORT! (ADR 0006
+// §2, §4; ADR 0010 §1).
 func (r resolver) fetchImport(url ImportURL, media MediaType) Value {
 	if r.comp.fetcher == nil {
 		return errorValue(ErrImport)
@@ -107,16 +126,32 @@ func (r resolver) fetchImport(url ImportURL, media MediaType) Value {
 	if err != nil {
 		return errorValue(ErrImport)
 	}
-	if res.ContentType != media {
+	received := res.ContentType.base()
+	if !acceptable(received, media) {
 		return errorValue(ErrImport)
 	}
-	return parseImport(res.Body, media, r.comp.limits)
+	return parseImport(res.Body, received, media, r.comp.limits)
 }
 
-// parseImport parses a fetched body as a values-only grid and shapes it to the
-// requested media type. A TSV read failure or an empty grid is #IMPORT!.
-func parseImport(body []byte, media MediaType, limits Limits) Value {
-	grid, err := ReadTSV(bytes.NewReader(body))
+// base strips any media-type parameters (`; charset=utf-8`) and normalizes
+// case, so handshake matching is against the base type alone (ADR 0010 §1).
+func (m MediaType) base() MediaType {
+	head, _, _ := strings.Cut(string(m), ";")
+	return MediaType(strings.ToLower(strings.TrimSpace(head)))
+}
+
+// acceptable reports whether a received base Content-Type satisfies the
+// handshake for the requested vendor media type: the vendor type itself or one
+// of the standard tabular types (ADR 0010 §1).
+func acceptable(received, media MediaType) boolResult {
+	return received == media || received == mediaTSV || received == mediaCSV
+}
+
+// parseImport parses a fetched body as a values-only grid — by the reader the
+// received base media type selects (ADR 0010 §3) — and shapes it to the
+// requested media type. A read failure or an empty grid is #IMPORT!.
+func parseImport(body []byte, received, media MediaType, limits Limits) Value {
+	grid, err := readImport(body, received)
 	if err != nil {
 		return errorValue(ErrImport)
 	}
@@ -125,6 +160,22 @@ func parseImport(body []byte, media MediaType, limits Limits) Value {
 		return errorValue(ErrImport)
 	}
 	return shapeImport(cells, media, limits)
+}
+
+// readImport reads a fetched body into a raw grid: a text/csv body via RFC 4180
+// (ragged rows tolerated here — shapeImport enforces rectangularity), anything
+// else via the engine's TSV reader (ADR 0010 §3).
+func readImport(body []byte, received MediaType) (Grid, error) {
+	if received != mediaCSV {
+		return ReadTSV(bytes.NewReader(body))
+	}
+	reader := csv.NewReader(bytes.NewReader(body))
+	reader.FieldsPerRecord = -1
+	records, err := reader.ReadAll()
+	if err != nil {
+		return nil, constants.ErrReadInput.With(err)
+	}
+	return records, nil
 }
 
 // importCells converts a fetched TSV grid to a value grid, VALUES ONLY: each
