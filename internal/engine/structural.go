@@ -207,16 +207,32 @@ func rewriteAll(cells [][]cell, ax axis, tr transform) Sheet {
 	})}
 }
 
-// rewriteCell shifts a formula cell's references and re-serialises it; a literal
-// passes through untouched.
+// rewriteCell shifts a formula cell's references and re-serialises it; a
+// literal passes through untouched, and so does a formula none of whose
+// references actually moved — re-rendering an untouched formula would reformat
+// its text, diff noise the line format exists to avoid.
 func rewriteCell(cl cell, ax axis, tr transform) cell {
 	if !cl.isFormula() {
 		return cl
 	}
+	moved := false
 	shifted := mapRefs(cl.formula, func(ref tsvt.Reference) tsvt.Expr {
-		return shiftReference(ref, ax, tr)
+		out := shiftReference(ref, ax, tr)
+		moved = moved || !sameReference(out, ref)
+		return out
 	})
+	if !moved {
+		return cl
+	}
 	return cell{formula: shifted, text: formulaMarker + renderExpr(shifted)}
+}
+
+// sameReference reports whether a shifted reference expression still names
+// exactly what the original reference named (compared in rendered form, which
+// is canonical for references).
+func sameReference(shifted tsvt.Expr, original tsvt.Reference) bool {
+	ref, isRef := shifted.(tsvt.RefOperand)
+	return isRef && renderExpr(ref) == renderExpr(tsvt.RefOperand{Ref: original.(tsvt.RangeRef)})
 }
 
 // shiftReference shifts one A1 reference, returning a #REF! error literal when

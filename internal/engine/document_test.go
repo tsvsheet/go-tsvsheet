@@ -114,6 +114,29 @@ func TestDocumentEditStability(t *testing.T) {
 	}
 }
 
+func TestStructuralEditsPreserveUntouchedFormulaText(t *testing.T) {
+	// A structural edit must not reformat formulas whose references it did not
+	// shift — rewriting "=A1+B1" to "=A1 + B1" is diff noise on untouched
+	// lines, against the format's core promise. Only formulas whose
+	// references actually move are re-rendered canonically.
+	doc := parseDoc(t, "1\t2\n=A1+B1\t= A1 *2\n")
+	// Inserting a row BELOW every referenced cell shifts nothing.
+	assert.Equal(t, "1\t2\n=A1+B1\t= A1 *2\n\t\n", string(doc.InsertRow(engine.Address{Row: 2}).Text()))
+	// Inserting a row above shifts both formulas' references: those cells are
+	// re-rendered canonically, and only those.
+	assert.Equal(t, "\t\n1\t2\n=A2 + B2\t=A2 * 2\n", string(doc.InsertRow(engine.Address{Row: 0}).Text()))
+}
+
+func TestStructuralEditsRerenderEveryShiftedNodeForm(t *testing.T) {
+	// When references DO shift, the formula is re-rendered canonically through
+	// every node form — unary, call, percent, concatenation, and the loosest-
+	// binding pipe spelling, which re-parenthesizes where an operator would
+	// capture its final call.
+	doc := parseDoc(t, "x\n=-A2 + sum(A2:A2) & B2% & (A2 | len())\n7\t8\n")
+	moved := doc.InsertRow(engine.Address{Row: 0})
+	assert.Equal(t, "\t\nx\n=-A3 + sum(A3:A3) & B3% & (A3 | len())\n7\t8\n", string(moved.Text()))
+}
+
 // mustSet applies SetCell, failing the test on error.
 func mustSet(t *testing.T, doc engine.Document, at engine.Address, text string) engine.Document {
 	t.Helper()
