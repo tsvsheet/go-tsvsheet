@@ -42,12 +42,15 @@ func unknownFunctions(expr tsvt.Expr, at Address) []Diagnostic {
 }
 
 // isKnownFunc reports whether name (case-insensitive) is a builtin: an eager
-// registry function, a lazily-dispatched conditional/embed/import, the clock
-// functions, or a value predicate.
+// registry function, a lazily-dispatched conditional/text/embed/import, the
+// clock functions, or a value predicate. Every lazy dispatcher of
+// resolver.lazyDispatchers must be represented here, or Check flags a name the
+// evaluator computes.
 func isKnownFunc(name funcName) boolResult {
 	lower := funcName(strings.ToLower(string(name)))
 	if isConditional(lower) || isTable(lower) || isCriteria(lower) || isArray(lower) ||
-		isEmbed(lower) || isImportName(lower) || lower == fnToday || lower == fnNow || lower == fnIsnow {
+		isText(lower) || isEmbed(lower) || isImportName(lower) ||
+		lower == fnToday || lower == fnNow || lower == fnIsnow {
 		return true
 	}
 	if _, ok := inspectors[string(lower)]; ok {

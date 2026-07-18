@@ -53,6 +53,14 @@ func TestCheck_KnownFunctionsClean(t *testing.T) {
 	)
 }
 
+func TestCheck_TextFunctionsKnown(t *testing.T) {
+	t.Parallel()
+
+	// The lazily-dispatched text builtins (REPT, bounded by the byte budget at
+	// compute time) are known — Check must not flag what the evaluator computes.
+	assert.Empty(t, engine.Check(parse(t, "3\t=rept(\"█\", A1)\n")))
+}
+
 func TestCheck_ImportFunctionsKnown(t *testing.T) {
 	t.Parallel()
 

@@ -132,11 +132,17 @@ func (r resolver) lazyDispatchers() []lazyDispatch {
 	}
 }
 
+// isText reports whether name is a lazily-dispatched text builtin — the set
+// evalText owns. Check consults it so the checker and the evaluator agree.
+func isText(name funcName) boolResult {
+	return name == "rept"
+}
+
 // evalText dispatches the text builtins that must read an injected resource
 // limit — currently only REPT, whose result is bounded by the byte budget. ok is
 // false for any other name.
 func (r resolver) evalText(name funcName, args []tsvt.Expr) (Value, boolResult) {
-	if name != "rept" {
+	if !isText(name) {
 		return Value{}, false
 	}
 	return r.evalRept(args), true
