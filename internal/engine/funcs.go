@@ -125,6 +125,8 @@ func (r resolver) lazyDispatchers() []lazyDispatch {
 		r.evalTable,
 		r.evalCriteria,
 		r.evalArray,
+		r.evalSeries,
+		r.evalDigest,
 		r.evalText,
 		r.evalEmbed,
 		r.evalImport,
@@ -516,4 +518,37 @@ var functions = map[string]function{
 	"pv":  {impl: fnPv, minArgs: 3, maxArgs: 5},
 	"npv": {impl: fnNpv, spec: scalarThenCells, minArgs: 2, maxArgs: -1},
 	"sln": {impl: fnSln, minArgs: 3, maxArgs: 3},
+
+	// Phase 9 — timeseries (MOVINGAVG/EMA/ROLLINGMIN/ROLLINGMAX/CUMSUM dispatch
+	// via the series path, which reads the range positionally and spills).
+
+	// Phase 10 — json (ADR 0011). JSONKEYS spills its key column.
+	"jsonget":  {impl: fnJSONGet, minArgs: 2, maxArgs: 2},
+	"jsonset":  {impl: fnJSONSet, minArgs: 3, maxArgs: 3},
+	"jsonkeys": {impl: fnJSONKeys, minArgs: 1, maxArgs: 2},
+	"jsonlen":  {impl: fnJSONLen, minArgs: 1, maxArgs: 2},
+	"jsontype": {impl: fnJSONType, minArgs: 1, maxArgs: 2},
+
+	// Phase 11 — url & email (ADR 0011; syntactic parsing only, no I/O).
+	"urlscheme":   {impl: urlPart(schemeOf), minArgs: 1, maxArgs: 1},
+	"urlhost":     {impl: urlPart(hostOf), minArgs: 1, maxArgs: 1},
+	"urlpath":     {impl: urlPart(pathOf), minArgs: 1, maxArgs: 1},
+	"urlfragment": {impl: urlPart(fragmentOf), minArgs: 1, maxArgs: 1},
+	"urlquery":    {impl: fnURLQuery, minArgs: 2, maxArgs: 2},
+	"urlencode":   {impl: fnURLEncode, minArgs: 1, maxArgs: 1},
+	"urldecode":   {impl: fnURLDecode, minArgs: 1, maxArgs: 1},
+	"emailvalid":  {impl: fnEmailValid, minArgs: 1, maxArgs: 1},
+	"emailuser":   {impl: emailPart(false), minArgs: 1, maxArgs: 1},
+	"emaildomain": {impl: emailPart(true), minArgs: 1, maxArgs: 1},
+
+	// Phase 12 — crypto (ADR 0011; digests over canonical text, weak digests
+	// deliberately absent).
+	"sha256":   {impl: fnHash("sha256"), minArgs: 1, maxArgs: 1},
+	"sha512":   {impl: fnHash("sha512"), minArgs: 1, maxArgs: 1},
+	"crc32":    {impl: fnCrc32, minArgs: 1, maxArgs: 1},
+	"hmac":     {impl: fnHmac, minArgs: 2, maxArgs: 3},
+	"base64":   {impl: fnBase64, minArgs: 1, maxArgs: 1},
+	"unbase64": {impl: fnUnbase64, minArgs: 1, maxArgs: 1},
+	"hex":      {impl: fnHex, minArgs: 1, maxArgs: 1},
+	"unhex":    {impl: fnUnhex, minArgs: 1, maxArgs: 1},
 }

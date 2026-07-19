@@ -41,17 +41,27 @@ func unknownFunctions(expr tsvt.Expr, at Address) []Diagnostic {
 	return diags
 }
 
+// isClock reports whether name is a volatile clock builtin.
+func isClock(name funcName) boolResult {
+	return name == fnToday || name == fnNow || name == fnIsnow
+}
+
+// lazyNamePredicates are the lazy-dispatch name predicates isKnownFunc
+// consults. Every lazy dispatcher of resolver.lazyDispatchers must be
+// represented here, or Check flags a name the evaluator computes.
+var lazyNamePredicates = []func(funcName) boolResult{
+	isConditional, isClock, isTable, isCriteria, isArray,
+	isSeries, isDigest, isText, isEmbed, isImportName,
+}
+
 // isKnownFunc reports whether name (case-insensitive) is a builtin: an eager
-// registry function, a lazily-dispatched conditional/text/embed/import, the
-// clock functions, or a value predicate. Every lazy dispatcher of
-// resolver.lazyDispatchers must be represented here, or Check flags a name the
-// evaluator computes.
+// registry function, a lazily-dispatched builtin, or a value predicate.
 func isKnownFunc(name funcName) boolResult {
 	lower := funcName(strings.ToLower(string(name)))
-	if isConditional(lower) || isTable(lower) || isCriteria(lower) || isArray(lower) ||
-		isText(lower) || isEmbed(lower) || isImportName(lower) ||
-		lower == fnToday || lower == fnNow || lower == fnIsnow {
-		return true
+	for _, isLazyName := range lazyNamePredicates {
+		if isLazyName(lower) {
+			return true
+		}
 	}
 	if _, ok := inspectors[string(lower)]; ok {
 		return true
