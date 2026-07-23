@@ -1,7 +1,12 @@
 name: wasm
+# The release workflow (nicerobot/tools.build/tag) pushes a SemVer tag with
+# GITHUB_TOKEN, which cannot fire an `on: push` trigger — so react to that
+# workflow COMPLETING via workflow_run, and build the wasm for the tag it just
+# minted. workflow_dispatch backfills a specific tag on demand.
 on:
-  release:
-    types: [published]
+  workflow_run:
+    workflows: [release]
+    types: [completed]
   workflow_dispatch:
     inputs:
       tag:
@@ -19,24 +24,48 @@ env:
   GOPRIVATE: github.com/gomatic/*,github.com/nicerobot/*,github.com/gloo-foo/*,github.com/sqlrest/*,github.com/uplang/*,github.com/tsvsheet/*,github.com/skykernel/*,github.com/xto-email/*
 jobs:
   wasm:
+    # Only when the release (tag) workflow succeeded, or an explicit backfill.
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
+      # workflow_run.head_sha is a GitHub-generated SHA (safe as a ref); for a
+      # dispatch it is empty, so checkout falls back to the default branch and the
+      # validated tag is checked out below.
       - uses: actions/checkout@v5
         with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
           persist-credentials: false
+      # Resolve the release tag from the dispatch input (via env, never inlined)
+      # or the tag the release workflow just pushed, and refuse anything that is
+      # not a plain SemVer tag before it is used anywhere.
+      - id: tag
+        env:
+          INPUT_TAG: ${{ github.event.inputs.tag }}
+        run: |
+          tag="$INPUT_TAG"
+          [ -n "$tag" ] || tag="$(git describe --tags --abbrev=0)"
+          case "$tag" in
+            v[0-9]*.[0-9]*.[0-9]*) ;;
+            *) echo "refusing non-SemVer tag: $tag" >&2; exit 1 ;;
+          esac
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+      - name: Check out the release tag
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: git checkout "$TAG"
       - uses: actions/setup-go@v5
         with:
           go-version: '1.26'
           check-latest: true
           cache: true
-      # Build the engine WebAssembly (dist/tsvsheet.wasm + dist/wasm_exec.js) and
-      # attach it to the release that triggered this run, so browser consumers
-      # (the docs playground, tsvsheet.js) pin a versioned tsvsheet.wasm.
+      # Build the engine WebAssembly and attach it to the release for this tag
+      # (created if missing), so browser consumers pin a versioned tsvsheet.wasm.
       - run: make wasm
       - uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event.inputs.tag || github.event.release.tag_name }}
+          tag_name: ${{ steps.tag.outputs.tag }}
           files: |
             dist/tsvsheet.wasm
             dist/wasm_exec.js
