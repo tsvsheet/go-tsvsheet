@@ -21,14 +21,21 @@ const (
 // methods mutate them in place (no reassignment) and every recursive read sees
 // the same state. now is the wall clock sampled once for the pass (volatile
 // functions).
+// rng is the pass PRNG, seeded from now so rand()/randbetween()/randarray()
+// re-roll each pass yet reproduce for a fixed clock (there is one engine, R1, so
+// its dependency-order draw sequence is the semantics); it is a shared pointer
+// because the computer is copied by value. tick is the injected recompute-pass
+// ordinal read by tick()/frame().
 type computer struct {
 	now     time.Time
+	rng     passRNG
 	fetcher Fetcher
 	env     embedEnv
 	sheet   Sheet
 	cache   [][]Value
 	phase   [][]cellPhase
 	limits  Limits
+	tick    Tick
 }
 
 // newComputer builds a computer sized to the sheet, with the pass clock and the
@@ -41,7 +48,8 @@ func newComputer(s Sheet, now time.Time) computer {
 		cache[r] = make([]Value, len(row))
 		phase[r] = make([]cellPhase, len(row))
 	}
-	return computer{now: now, sheet: s, cache: cache, phase: phase, limits: DefaultLimits()}
+	rng := newPassRNG(prngSeed(now.UnixNano()))
+	return computer{now: now, rng: rng, sheet: s, cache: cache, phase: phase, limits: DefaultLimits()}
 }
 
 // cellValue is a cell's evaluated Value: a literal parsed, a formula computed

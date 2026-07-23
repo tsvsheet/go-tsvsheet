@@ -50,7 +50,7 @@ func isClock(name funcName) boolResult {
 // consults. Every lazy dispatcher of resolver.lazyDispatchers must be
 // represented here, or Check flags a name the evaluator computes.
 var lazyNamePredicates = []func(funcName) boolResult{
-	isConditional, isClock, isTable, isCriteria, isArray,
+	isConditional, isClock, isVolatileFn, isRandom, isTable, isCriteria, isArray,
 	isSeries, isDigest, isText, isEmbed, isImportName,
 }
 

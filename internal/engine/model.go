@@ -96,7 +96,16 @@ func (s Sheet) Compute() Grid { return s.ComputeAt(time.Now()) }
 // deterministic within a pass (and testable). It computes every cell's value,
 // then renders — spilling dynamic-array results into empty neighbours.
 func (s Sheet) ComputeAt(at time.Time) Grid {
-	return s.computeGrid(newComputer(s, at))
+	return s.ComputeAtTick(at, 0)
+}
+
+// ComputeAtTick evaluates the sheet against clock at with the recompute-pass
+// ordinal tick injected for tick()/frame(). A frontend that re-renders a
+// volatile sheet increments tick each pass; ComputeAt uses 0.
+func (s Sheet) ComputeAtTick(at time.Time, tick Tick) Grid {
+	comp := newComputer(s, at)
+	comp.tick = tick
+	return s.computeGrid(comp)
 }
 
 // computeGrid evaluates every cell through comp and renders the value grid,

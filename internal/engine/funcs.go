@@ -122,6 +122,8 @@ func (r resolver) lazyDispatchers() []lazyDispatch {
 	return []lazyDispatch{
 		r.evalConditional,
 		r.evalClock,
+		r.evalVolatile,
+		r.evalRandom,
 		r.evalTable,
 		r.evalCriteria,
 		r.evalArray,
