@@ -37,14 +37,16 @@ func main() {
 // view is the render model returned to JS after any operation: the computed
 // grid, the (possibly edited) source, the canonical source text (the one
 // sanctioned serialization — comment and shebang lines preserved), static
-// diagnostics, and whether any formula is clock-volatile (so the page can
-// offer periodic recompute).
+// diagnostics, and the sheet's volatility — both the bare "is anything live"
+// flag and one cadence spec per volatile(…) call, so the page can recompute at
+// the soonest cadence the sheet asks for rather than a flat interval.
 type view struct {
 	Computed    [][]string            `json:"computed"`
 	Source      [][]string            `json:"source"`
 	Text        string                `json:"text"`
 	Diagnostics []tsvsheet.Diagnostic `json:"diagnostics"`
 	Volatile    bool                  `json:"volatile"`
+	Schedules   []string              `json:"schedules"`
 }
 
 // browserTick is the recompute-pass ordinal, advanced on every render so
@@ -65,6 +67,7 @@ func render(doc tsvsheet.Document) view {
 		Text:        string(doc.Text()),
 		Diagnostics: tsvsheet.Check(sheet),
 		Volatile:    sheet.IsVolatile(),
+		Schedules:   sheet.VolatileSchedules(),
 	}
 }
 
