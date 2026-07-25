@@ -184,7 +184,16 @@ func renderQualifier(file Path) string {
 	return `"` + string(file) + `"!`
 }
 
-// renderCell reconstructs one A1 cell (`B2`).
+// renderCell reconstructs one A1 cell with its `$` pins (`B2`, `$B$2`).
 func renderCell(cell tsvt.CellRef) string {
-	return cell.Col + strconv.Itoa(cell.Row)
+	return pin(boolResult(cell.IsColAbsolute)) + cell.Col +
+		pin(boolResult(cell.IsRowAbsolute)) + strconv.Itoa(cell.Row)
+}
+
+// pin renders one `$` absolute marker, or "" when the coordinate is unpinned.
+func pin(isAbsolute boolResult) string {
+	if isAbsolute {
+		return "$"
+	}
+	return ""
 }

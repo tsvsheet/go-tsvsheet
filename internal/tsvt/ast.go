@@ -125,10 +125,15 @@ type RangeRef struct {
 	From CellRef
 }
 
-// CellRef is an A1 cell: a column label and a 1-based row. The `$` absolute
-// markers are accepted by the grammar but carry no positional difference in a
-// flat grid, so they are not retained.
+// CellRef is an A1 cell: a column label and a 1-based row. The Is*Absolute
+// flags record the `$` markers (`$B$2`, `$B2`, `B$2`), which SPECIFICATION §4
+// retains for familiarity and Excel round-tripping. They carry no positional
+// difference — evaluation and structural edits treat a pinned and an unpinned
+// coordinate identically (Excel-faithful: `$` pins only under copy/fill) — so
+// their sole effect is surviving to the re-rendered formula.
 type CellRef struct {
-	Col string
-	Row int
+	Col           string
+	Row           int
+	IsColAbsolute bool
+	IsRowAbsolute bool
 }

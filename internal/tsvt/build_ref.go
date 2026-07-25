@@ -32,11 +32,30 @@ func buildQualifier(ctx grammar.ISheetQualifierContext) string {
 	return unquote(quoted(ctx.STRING().GetText()))
 }
 
-// buildCellRef builds one A1 cell (column letters + 1-based row).
+// buildCellRef builds one A1 cell (column letters + 1-based row), retaining
+// its `$` absolute markers (SPECIFICATION §4).
 func buildCellRef(ctx grammar.ICellRefContext) (CellRef, error) {
 	row, err := intToken(ctx.NUMBER())
 	if err != nil {
 		return CellRef{}, err
 	}
-	return CellRef{Col: ctx.COL().GetText(), Row: row}, nil
+	isColAbsolute, isRowAbsolute := pins(ctx)
+	return CellRef{
+		Col: ctx.COL().GetText(), Row: row,
+		IsColAbsolute: isColAbsolute, IsRowAbsolute: isRowAbsolute,
+	}, nil
+}
+
+// pins reads a cell's `$` markers (cellRef: DOLLAR? COL DOLLAR? NUMBER): a
+// dollar before the column letters pins the column, one after pins the row.
+func pins(ctx grammar.ICellRefContext) (isColAbsolute, isRowAbsolute bool) {
+	col := ctx.COL().GetSymbol().GetTokenIndex()
+	for _, dollar := range ctx.AllDOLLAR() {
+		if dollar.GetSymbol().GetTokenIndex() < col {
+			isColAbsolute = true
+		} else {
+			isRowAbsolute = true
+		}
+	}
+	return isColAbsolute, isRowAbsolute
 }

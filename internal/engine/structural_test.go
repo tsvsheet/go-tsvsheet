@@ -142,3 +142,32 @@ func TestStructuralEdits_RaggedRowsAndAllNodeForms(t *testing.T) {
 	assert.Len(t, del.Source()[0], 2)                // row 0 now ends at the formula
 	assert.Equal(t, formula, sourceAt(t, del, 0, 1)) // literal "x" and all nodes preserved
 }
+
+func TestStructuralEdits_RetainAbsoluteMarkers(t *testing.T) {
+	t.Parallel()
+
+	// SPECIFICATION §4: `$` pins are retained through re-rendering, and — as in
+	// Excel — a structural edit shifts a pinned reference exactly like an
+	// unpinned one (the data it names moved; `$` pins only under copy/fill).
+	s := parse(t, "10\t=$A$1*2\t=sum($A$1:A1)\t=A$1+$A1\n")
+	got := s.InsertRow(addr(0, 0)) // blank row above: every row-1 ref follows to row 2
+
+	assert.Equal(t, "=$A$2 * 2", sourceAt(t, got, 1, 1))
+	assert.Equal(t, "=sum($A$2:A2)", sourceAt(t, got, 1, 2))
+	assert.Equal(t, "=A$2 + $A2", sourceAt(t, got, 1, 3))
+	g := got.Compute()
+	assert.Equal(t, "20", cellAt(t, g, 1, 1)) // pins carry no positional difference
+	assert.Equal(t, "10", cellAt(t, g, 1, 2))
+	assert.Equal(t, "20", cellAt(t, g, 1, 3))
+}
+
+func TestStructuralEdits_UnmovedPinnedFormulaKeepsSpelling(t *testing.T) {
+	t.Parallel()
+
+	// A formula none of whose references moved is not re-rendered, so its
+	// original `$` spelling (and spacing) survives byte-for-byte.
+	s := parse(t, "10\t=$A$1*2\n")
+	got := s.InsertRow(addr(1, 0)) // insert below: nothing at/after row 2 is referenced
+
+	assert.Equal(t, "=$A$1*2", sourceAt(t, got, 0, 1))
+}

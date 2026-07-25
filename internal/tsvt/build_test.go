@@ -43,11 +43,17 @@ func TestBuild_Error(t *testing.T) {
 
 func TestBuild_Reference(t *testing.T) {
 	t.Parallel()
-	want := tsvt.RefOperand{Ref: tsvt.RangeRef{From: tsvt.CellRef{Col: "B", Row: 2}}}
-	assert.Equal(t, want, parse(t, "B2"))
-	// $-absolute markers are accepted and carry no positional difference.
-	assert.Equal(t, want, parse(t, "$B$2"))
-	assert.Equal(t, want, parse(t, "B$2"))
+	cell := func(isColAbsolute, isRowAbsolute bool) tsvt.RefOperand {
+		return tsvt.RefOperand{Ref: tsvt.RangeRef{
+			From: tsvt.CellRef{Col: "B", Row: 2, IsColAbsolute: isColAbsolute, IsRowAbsolute: isRowAbsolute},
+		}}
+	}
+	assert.Equal(t, cell(false, false), parse(t, "B2"))
+	// $-absolute markers are retained (SPECIFICATION §4), each pinning its own
+	// coordinate; they carry no positional difference.
+	assert.Equal(t, cell(true, true), parse(t, "$B$2"))
+	assert.Equal(t, cell(false, true), parse(t, "B$2"))
+	assert.Equal(t, cell(true, false), parse(t, "$B2"))
 }
 
 func TestBuild_Range(t *testing.T) {
