@@ -28,6 +28,9 @@ func main() {
 	obj.Set("deleteRow", js.FuncOf(edit(tsvsheet.Document.DeleteRow)))
 	obj.Set("insertCol", js.FuncOf(edit(tsvsheet.Document.InsertCol)))
 	obj.Set("deleteCol", js.FuncOf(edit(tsvsheet.Document.DeleteCol)))
+	obj.Set("duplicateRow", js.FuncOf(edit(tsvsheet.Document.DuplicateRow)))
+	obj.Set("duplicateCol", js.FuncOf(edit(tsvsheet.Document.DuplicateCol)))
+	obj.Set("fill", js.FuncOf(fill))
 	obj.Set("references", js.FuncOf(references))
 	obj.Set("explain", js.FuncOf(explain))
 	js.Global().Set("tsvsheet", obj)
@@ -123,6 +126,18 @@ func edit(op func(tsvsheet.Document, tsvsheet.Address) tsvsheet.Document) func(j
 		}
 		return result(render(op(doc, addr(args[1], args[2]))), nil)
 	}
+}
+
+// fill copies one cell across a target span with fill semantics — unpinned
+// references shift by each target's offset, `$`-pinned coordinates hold — and
+// re-renders (args: source, fromRow, fromCol, loRow, loCol, hiRow, hiCol).
+func fill(_ js.Value, args []js.Value) any {
+	doc, err := parse(args)
+	if err != nil {
+		return result(nil, err)
+	}
+	to := tsvsheet.Span{From: addr(args[3], args[4]), To: addr(args[5], args[6])}
+	return result(render(doc.Fill(addr(args[1], args[2]), to)), nil)
 }
 
 // references returns a cell's precedents and dependents (args: source, row, col).

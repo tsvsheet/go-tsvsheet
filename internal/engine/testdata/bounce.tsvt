@@ -1,0 +1,15 @@
+# bounce.tsvt — motion with no artwork: every position is arithmetic on frame.
+# A1 counts 0..35 and marks the sheet live at 100ms. Each row adds its own phase
+# from column A, and abs(…-18) folds that count into a triangle wave — a ball that
+# runs to the wall and turns around. The per-row phase lag is what makes the wave
+# travel down the sheet. Widen the track by changing 18 (and 36, twice that);
+# add rows to lengthen the wave, or flatten the phases to move every row together.
+=mod(frame,36) | volatile("100ms")	at	track
+0	=abs(mod($A$1 + A2,36) - 18)	="|" & rept(" ",B2) & "o" & rept(" ",18 - B2) & "|"
+3	=abs(mod($A$1 + A3,36) - 18)	="|" & rept(" ",B3) & "o" & rept(" ",18 - B3) & "|"
+6	=abs(mod($A$1 + A4,36) - 18)	="|" & rept(" ",B4) & "o" & rept(" ",18 - B4) & "|"
+9	=abs(mod($A$1 + A5,36) - 18)	="|" & rept(" ",B5) & "o" & rept(" ",18 - B5) & "|"
+12	=abs(mod($A$1 + A6,36) - 18)	="|" & rept(" ",B6) & "o" & rept(" ",18 - B6) & "|"
+15	=abs(mod($A$1 + A7,36) - 18)	="|" & rept(" ",B7) & "o" & rept(" ",18 - B7) & "|"
+18	=abs(mod($A$1 + A8,36) - 18)	="|" & rept(" ",B8) & "o" & rept(" ",18 - B8) & "|"
+21	=abs(mod($A$1 + A9,36) - 18)	="|" & rept(" ",B9) & "o" & rept(" ",18 - B9) & "|"

@@ -106,6 +106,32 @@ func (d Document) DeleteRow(at Address) Document {
 	return Document{sheet: sheet, layout: append(layout, d.layout[idx+1:]...)}
 }
 
+// Fill returns a new document with Sheet.Fill applied; rows the grid grew by
+// are appended to the layout after any trailing comments, as SetCell's growth
+// is.
+func (d Document) Fill(from Address, to Span) Document {
+	sheet := d.sheet.Fill(from, to)
+	grown := rowIndex(len(sheet.cells) - len(d.sheet.cells))
+	return Document{sheet: sheet, layout: appendMarkers(d.layout, grown)}
+}
+
+// DuplicateRow returns a new document with row at.Row duplicated below itself
+// (Sheet.DuplicateRow semantics); comments keep the between-row gap they were
+// written in. A no-op on the sheet is a no-op on the document.
+func (d Document) DuplicateRow(at Address) Document {
+	sheet := d.sheet.DuplicateRow(at)
+	if len(sheet.cells) == len(d.sheet.cells) {
+		return d
+	}
+	return Document{sheet: sheet, layout: spliceMarker(d.layout, rowIndex(at.Row+1))}
+}
+
+// DuplicateCol returns a new document with column at.Col duplicated to its
+// right; column operations never touch the line layout.
+func (d Document) DuplicateCol(at Address) Document {
+	return Document{sheet: d.sheet.DuplicateCol(at), layout: d.layout}
+}
+
 // InsertCol returns a new document with a blank column inserted before at.Col;
 // column operations never touch the line layout.
 func (d Document) InsertCol(at Address) Document {
