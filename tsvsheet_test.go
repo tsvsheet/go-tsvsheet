@@ -28,6 +28,20 @@ func TestFacadeRoundTrip(t *testing.T) {
 	require.NoError(t, tsvsheet.WriteTSV(&buf, grid))
 	want.Equal("a\tb\n1\t2\n", buf.String())
 
+	// A document declares its own view, resolved against its own extent.
+	viewDoc, err := tsvsheet.ParseDocument([]byte("#.header\trows(count(1))\n#.hide\tcols(range(B:B))\nn\tq\nx\t1\n"))
+	require.NoError(t, err)
+	view, viewDiags := viewDoc.View()
+	want.Empty(viewDiags)
+	want.Equal(tsvsheet.Extent{Rows: 2, Cols: 2}, viewDoc.Extent())
+	want.Equal(tsvsheet.Selection{1: true}, view.HeaderRows)
+	want.Equal(tsvsheet.Selection{2: true}, view.HiddenCols)
+
+	directives, directiveDiags := viewDoc.Directives()
+	want.Empty(directiveDiags)
+	want.Len(directives, 2)
+	want.Equal(tsvsheet.KeyHeader, directives[0].Key)
+
 	// IsCommentLine exposes the marker family a frontend needs to map document
 	// lines to grid rows: `#.` anywhere, `#!` on line 1, legacy `# `, and
 	// nothing else — a hash before a TAB is data.

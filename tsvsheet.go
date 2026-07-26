@@ -29,8 +29,10 @@ type ComputeOptions = engine.ComputeOptions
 // re-renders a volatile sheet passes an incrementing value each pass.
 type Tick = engine.Tick
 
-// Diagnostic is an advisory finding about a formula cell: currently an unknown
-// function call (which computes to #NAME?).
+// Diagnostic is an advisory finding about a sheet: an unknown function call in
+// a formula cell (which computes to #NAME?), or a view directive that cannot be
+// read. A cell finding carries Cell; a directive finding carries Line, since a
+// directive occupies a physical line and no grid row.
 type Diagnostic = engine.Diagnostic
 
 // ErrorValue is a spreadsheet error value — a cell value, not a Go error. It
@@ -131,6 +133,35 @@ const (
 // begins with `=` — a formula compiled from the expression that follows. A
 // malformed formula is a syntax error naming its cell.
 func Parse(src []byte) (Sheet, error) { return engine.Parse(src) }
+
+// View is what a viewport does with a grid, as the sheet's own `#.` directives
+// declare it: which rows and columns are hidden, carry headers, or stay
+// anchored while the rest scrolls. Every field is a set of 1-based positions,
+// resolved against the sheet's extent, so a host renders it without deriving
+// anything itself.
+type View = engine.View
+
+// Selection is a set of 1-based positions on one axis.
+type Selection = engine.Selection
+
+// Extent is a grid's size in rows and columns; edge-anchored directive items
+// resolve against it.
+type Extent = engine.Extent
+
+// Directive is one key/value pair read from a `#.` line, with the physical line
+// it came from.
+type Directive = engine.Directive
+
+// Key is a view-directive key: hide, header, or freeze.
+type Key = engine.Key
+
+// The view-directive keys, one per class — a projection, a structure
+// declaration, and a viewport hint.
+const (
+	KeyHide   = engine.KeyHide
+	KeyHeader = engine.KeyHeader
+	KeyFreeze = engine.KeyFreeze
+)
 
 // Document is a parsed .tsvt file with its physical line layout retained, so
 // comment and shebang lines — which the grid drops — survive editing and are
