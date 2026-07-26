@@ -25,10 +25,11 @@ type Grid [][]string
 
 // ReadTSV reads a tab-separated value grid. Rows are newline-separated; a
 // trailing newline does not add an empty row. Full-line comments are skipped
-// and do not occupy a grid row: a leading `#!` on the first line (a shebang, so
-// a .tsvt can be `chmod +x` and run via `#!/usr/bin/env tsvsheet`) and any line
-// beginning with `# ` (hash-space). An error-value cell like `#N/A` (hash then a
-// non-space) is data, not a comment. A read failure surfaces as ErrReadInput.
+// and do not occupy a grid row, per IsCommentLine: a leading `#!` on the first
+// line (a shebang, so a .tsvt can be `chmod +x` and run via
+// `#!/usr/bin/env tsvsheet`), any `#.` directive-or-comment line, and any
+// legacy `# ` hash-space line. An error-value cell like `#N/A` is data, not a
+// comment. A read failure surfaces as ErrReadInput.
 func ReadTSV(r io.Reader) (Grid, error) {
 	grid := Grid{}
 	err := scanLines(r, func(text string, isComment bool) {
@@ -42,20 +43,53 @@ func ReadTSV(r io.Reader) (Grid, error) {
 	return grid, nil
 }
 
+// LineNumber is a 1-based physical line position in a .tsvt source file, as
+// opposed to a grid row: comment lines occupy a line but no row.
+type LineNumber int
+
+// SourceLine is one physical line of .tsvt source, newline already stripped.
+type SourceLine string
+
+// Line markers of SPECIFICATION §3. shebangMarker opens the first line only;
+// directiveMarker opens a directive or comment line anywhere; legacyMarker is
+// the superseded hash-space comment form, still accepted so that sheets and
+// share links written before the change keep parsing. No marker involves
+// whitespace except the legacy one — which is exactly why it was superseded, a
+// space being indistinguishable from the TAB that separates fields.
+const (
+	shebangMarker   = "#!"
+	directiveMarker = "#."
+	legacyMarker    = "# "
+)
+
+// IsCommentLine reports whether the line at 1-based position at is one the grid
+// skips: a first-line `#!` shebang, a `#.` directive-or-comment line, or a
+// legacy `# ` hash-space comment. Everything else is data — including `#N/A`
+// (hash then a letter) and `#<TAB>x` (hash then a TAB), so a mistyped marker
+// shows up as a visible row rather than silently shifting A1 addresses.
+//
+// This is the single definition of the rule; frontends call it rather than
+// re-testing the prefixes themselves.
+func IsCommentLine(at LineNumber, text SourceLine) bool {
+	line := string(text)
+	if at == 1 && strings.HasPrefix(line, shebangMarker) {
+		return true
+	}
+	return strings.HasPrefix(line, directiveMarker) || strings.HasPrefix(line, legacyMarker)
+}
+
 // scanLines reads r line by line, calling fn with each line's text and whether
-// it is a comment line (a first-line `#!` shebang or a `# ` hash-space line —
-// the lines ReadTSV skips and Document preserves). A read failure surfaces as
-// ErrReadInput.
+// IsCommentLine classifies it as a comment — the lines ReadTSV skips and
+// Document preserves. A read failure surfaces as ErrReadInput.
 func scanLines(r io.Reader, fn func(text string, isComment bool)) error {
 	scanner := bufio.NewScanner(r)
 	scanner.Buffer(make([]byte, 0, bufio.MaxScanTokenSize), maxLineBytes)
 
-	lineNum := 0
+	lineNum := LineNumber(0)
 	for scanner.Scan() {
 		lineNum++
 		text := scanner.Text()
-		isShebang := lineNum == 1 && strings.HasPrefix(text, "#!")
-		fn(text, isShebang || strings.HasPrefix(text, "# "))
+		fn(text, IsCommentLine(lineNum, SourceLine(text)))
 	}
 	if err := scanner.Err(); err != nil {
 		return constants.ErrReadInput.With(err)

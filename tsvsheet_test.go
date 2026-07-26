@@ -28,6 +28,15 @@ func TestFacadeRoundTrip(t *testing.T) {
 	require.NoError(t, tsvsheet.WriteTSV(&buf, grid))
 	want.Equal("a\tb\n1\t2\n", buf.String())
 
+	// IsCommentLine exposes the marker family a frontend needs to map document
+	// lines to grid rows: `#.` anywhere, `#!` on line 1, legacy `# `, and
+	// nothing else — a hash before a TAB is data.
+	want.True(tsvsheet.IsCommentLine(2, tsvsheet.SourceLine("#.hide-cols\tB-M")))
+	want.True(tsvsheet.IsCommentLine(1, tsvsheet.SourceLine("#!/usr/bin/env tsvsheet")))
+	want.True(tsvsheet.IsCommentLine(2, tsvsheet.SourceLine("# legacy note")))
+	want.False(tsvsheet.IsCommentLine(2, tsvsheet.SourceLine("#\tnot a comment")))
+	want.False(tsvsheet.IsCommentLine(2, tsvsheet.SourceLine("#N/A\t=A2")))
+
 	// Parse -> Compute: a formula cell computes in place.
 	sheet, err := tsvsheet.Parse([]byte("2\t3\t=A1 + B1\n"))
 	require.NoError(t, err)

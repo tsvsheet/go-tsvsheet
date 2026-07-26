@@ -58,6 +58,13 @@ type Fetcher = engine.Fetcher
 // after ComputeAt.
 type Grid = engine.Grid
 
+// LineNumber is a 1-based physical line position in a .tsvt source file, as
+// opposed to a grid row: comment lines occupy a line but no row.
+type LineNumber = engine.LineNumber
+
+// SourceLine is one physical line of .tsvt source, newline already stripped.
+type SourceLine = engine.SourceLine
+
 // ImportURL is the location an IMPORT* function fetches — the (already
 // evaluated) string value of its single argument.
 type ImportURL = engine.ImportURL
@@ -148,11 +155,22 @@ func Check(s Sheet) []Diagnostic { return engine.Check(s) }
 
 // ReadTSV reads a tab-separated value grid. Rows are newline-separated; a
 // trailing newline does not add an empty row. Full-line comments are skipped
-// and do not occupy a grid row: a leading `#!` on the first line (a shebang, so
-// a .tsvt can be `chmod +x` and run via `#!/usr/bin/env tsvsheet`) and any line
-// beginning with `# ` (hash-space). An error-value cell like `#N/A` (hash then a
-// non-space) is data, not a comment. A read failure surfaces as ErrReadInput.
+// and do not occupy a grid row, per IsCommentLine: a leading `#!` on the first
+// line (a shebang, so a .tsvt can be `chmod +x` and run via
+// `#!/usr/bin/env tsvsheet`), any `#.` directive-or-comment line, and any
+// legacy `# ` hash-space line. An error-value cell like `#N/A` is data, not a
+// comment. A read failure surfaces as ErrReadInput.
 func ReadTSV(r io.Reader) (Grid, error) { return engine.ReadTSV(r) }
+
+// IsCommentLine reports whether the line at 1-based position at is one the grid
+// skips rather than treating as a row: a first-line `#!` shebang, a `#.`
+// directive-or-comment line, or a legacy `# ` hash-space comment. Everything
+// else is data, including `#N/A` and a hash followed by a TAB.
+//
+// Frontends that map document lines to grid rows — an LSP, an editor gutter —
+// call this instead of testing the prefixes themselves, so the language has one
+// definition of what a comment is.
+func IsCommentLine(at LineNumber, text SourceLine) bool { return engine.IsCommentLine(at, text) }
 
 // WriteTSV writes the grid as tab-separated rows, each terminated by a newline.
 // A write failure surfaces as constants.ErrWriteFile. Callers wanting buffering
