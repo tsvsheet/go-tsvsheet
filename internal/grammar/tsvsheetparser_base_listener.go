@@ -140,32 +140,56 @@ func (s *BaseTsvsheetParserListener) EnterCellRef(ctx *CellRefContext) {}
 // ExitCellRef is called when production cellRef is exited.
 func (s *BaseTsvsheetParserListener) ExitCellRef(ctx *CellRefContext) {}
 
-// EnterRowSelector is called when production rowSelector is entered.
-func (s *BaseTsvsheetParserListener) EnterRowSelector(ctx *RowSelectorContext) {}
+// EnterDirectiveValue is called when production directiveValue is entered.
+func (s *BaseTsvsheetParserListener) EnterDirectiveValue(ctx *DirectiveValueContext) {}
 
-// ExitRowSelector is called when production rowSelector is exited.
-func (s *BaseTsvsheetParserListener) ExitRowSelector(ctx *RowSelectorContext) {}
+// ExitDirectiveValue is called when production directiveValue is exited.
+func (s *BaseTsvsheetParserListener) ExitDirectiveValue(ctx *DirectiveValueContext) {}
 
-// EnterColSelector is called when production colSelector is entered.
-func (s *BaseTsvsheetParserListener) EnterColSelector(ctx *ColSelectorContext) {}
+// EnterAxisCall is called when production axisCall is entered.
+func (s *BaseTsvsheetParserListener) EnterAxisCall(ctx *AxisCallContext) {}
 
-// ExitColSelector is called when production colSelector is exited.
-func (s *BaseTsvsheetParserListener) ExitColSelector(ctx *ColSelectorContext) {}
+// ExitAxisCall is called when production axisCall is exited.
+func (s *BaseTsvsheetParserListener) ExitAxisCall(ctx *AxisCallContext) {}
 
-// EnterCountValue is called when production countValue is entered.
-func (s *BaseTsvsheetParserListener) EnterCountValue(ctx *CountValueContext) {}
+// EnterItemList is called when production itemList is entered.
+func (s *BaseTsvsheetParserListener) EnterItemList(ctx *ItemListContext) {}
 
-// ExitCountValue is called when production countValue is exited.
-func (s *BaseTsvsheetParserListener) ExitCountValue(ctx *CountValueContext) {}
+// ExitItemList is called when production itemList is exited.
+func (s *BaseTsvsheetParserListener) ExitItemList(ctx *ItemListContext) {}
 
-// EnterRowSpan is called when production rowSpan is entered.
-func (s *BaseTsvsheetParserListener) EnterRowSpan(ctx *RowSpanContext) {}
+// EnterItem is called when production item is entered.
+func (s *BaseTsvsheetParserListener) EnterItem(ctx *ItemContext) {}
 
-// ExitRowSpan is called when production rowSpan is exited.
-func (s *BaseTsvsheetParserListener) ExitRowSpan(ctx *RowSpanContext) {}
+// ExitItem is called when production item is exited.
+func (s *BaseTsvsheetParserListener) ExitItem(ctx *ItemContext) {}
 
-// EnterColSpan is called when production colSpan is entered.
-func (s *BaseTsvsheetParserListener) EnterColSpan(ctx *ColSpanContext) {}
+// EnterRangeCall is called when production rangeCall is entered.
+func (s *BaseTsvsheetParserListener) EnterRangeCall(ctx *RangeCallContext) {}
 
-// ExitColSpan is called when production colSpan is exited.
-func (s *BaseTsvsheetParserListener) ExitColSpan(ctx *ColSpanContext) {}
+// ExitRangeCall is called when production rangeCall is exited.
+func (s *BaseTsvsheetParserListener) ExitRangeCall(ctx *RangeCallContext) {}
+
+// EnterCountCall is called when production countCall is entered.
+func (s *BaseTsvsheetParserListener) EnterCountCall(ctx *CountCallContext) {}
+
+// ExitCountCall is called when production countCall is exited.
+func (s *BaseTsvsheetParserListener) ExitCountCall(ctx *CountCallContext) {}
+
+// EnterSpan is called when production span is entered.
+func (s *BaseTsvsheetParserListener) EnterSpan(ctx *SpanContext) {}
+
+// ExitSpan is called when production span is exited.
+func (s *BaseTsvsheetParserListener) ExitSpan(ctx *SpanContext) {}
+
+// EnterEndpoint is called when production endpoint is entered.
+func (s *BaseTsvsheetParserListener) EnterEndpoint(ctx *EndpointContext) {}
+
+// ExitEndpoint is called when production endpoint is exited.
+func (s *BaseTsvsheetParserListener) ExitEndpoint(ctx *EndpointContext) {}
+
+// EnterOffset is called when production offset is entered.
+func (s *BaseTsvsheetParserListener) EnterOffset(ctx *OffsetContext) {}
+
+// ExitOffset is called when production offset is exited.
+func (s *BaseTsvsheetParserListener) ExitOffset(ctx *OffsetContext) {}

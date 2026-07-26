@@ -87,22 +87,38 @@ func (v *BaseTsvsheetParserVisitor) VisitCellRef(ctx *CellRefContext) interface{
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseTsvsheetParserVisitor) VisitRowSelector(ctx *RowSelectorContext) interface{} {
+func (v *BaseTsvsheetParserVisitor) VisitDirectiveValue(ctx *DirectiveValueContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseTsvsheetParserVisitor) VisitColSelector(ctx *ColSelectorContext) interface{} {
+func (v *BaseTsvsheetParserVisitor) VisitAxisCall(ctx *AxisCallContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseTsvsheetParserVisitor) VisitCountValue(ctx *CountValueContext) interface{} {
+func (v *BaseTsvsheetParserVisitor) VisitItemList(ctx *ItemListContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseTsvsheetParserVisitor) VisitRowSpan(ctx *RowSpanContext) interface{} {
+func (v *BaseTsvsheetParserVisitor) VisitItem(ctx *ItemContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseTsvsheetParserVisitor) VisitColSpan(ctx *ColSpanContext) interface{} {
+func (v *BaseTsvsheetParserVisitor) VisitRangeCall(ctx *RangeCallContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseTsvsheetParserVisitor) VisitCountCall(ctx *CountCallContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseTsvsheetParserVisitor) VisitSpan(ctx *SpanContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseTsvsheetParserVisitor) VisitEndpoint(ctx *EndpointContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseTsvsheetParserVisitor) VisitOffset(ctx *OffsetContext) interface{} {
 	return v.VisitChildren(ctx)
 }

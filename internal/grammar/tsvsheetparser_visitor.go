@@ -67,18 +67,30 @@ type TsvsheetParserVisitor interface {
 	// Visit a parse tree produced by TsvsheetParser#cellRef.
 	VisitCellRef(ctx *CellRefContext) interface{}
 
-	// Visit a parse tree produced by TsvsheetParser#rowSelector.
-	VisitRowSelector(ctx *RowSelectorContext) interface{}
+	// Visit a parse tree produced by TsvsheetParser#directiveValue.
+	VisitDirectiveValue(ctx *DirectiveValueContext) interface{}
 
-	// Visit a parse tree produced by TsvsheetParser#colSelector.
-	VisitColSelector(ctx *ColSelectorContext) interface{}
+	// Visit a parse tree produced by TsvsheetParser#axisCall.
+	VisitAxisCall(ctx *AxisCallContext) interface{}
 
-	// Visit a parse tree produced by TsvsheetParser#countValue.
-	VisitCountValue(ctx *CountValueContext) interface{}
+	// Visit a parse tree produced by TsvsheetParser#itemList.
+	VisitItemList(ctx *ItemListContext) interface{}
 
-	// Visit a parse tree produced by TsvsheetParser#rowSpan.
-	VisitRowSpan(ctx *RowSpanContext) interface{}
+	// Visit a parse tree produced by TsvsheetParser#item.
+	VisitItem(ctx *ItemContext) interface{}
 
-	// Visit a parse tree produced by TsvsheetParser#colSpan.
-	VisitColSpan(ctx *ColSpanContext) interface{}
+	// Visit a parse tree produced by TsvsheetParser#rangeCall.
+	VisitRangeCall(ctx *RangeCallContext) interface{}
+
+	// Visit a parse tree produced by TsvsheetParser#countCall.
+	VisitCountCall(ctx *CountCallContext) interface{}
+
+	// Visit a parse tree produced by TsvsheetParser#span.
+	VisitSpan(ctx *SpanContext) interface{}
+
+	// Visit a parse tree produced by TsvsheetParser#endpoint.
+	VisitEndpoint(ctx *EndpointContext) interface{}
+
+	// Visit a parse tree produced by TsvsheetParser#offset.
+	VisitOffset(ctx *OffsetContext) interface{}
 }

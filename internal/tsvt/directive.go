@@ -1,12 +1,17 @@
-// View-directive values: the row/column selectors and counts that follow a key
-// on a `#.` line (SPECIFICATION §3). The LINE is a TSV row split by the host,
-// exactly like a grid row; only a VALUE is parsed here, through the grammar's
-// own rowSelector/colSelector/countValue entry rules, so no reader splits
-// selector text by hand and every implementation rejects the same inputs.
+// View-directive values: the axis call that follows a key on a `#.` line
+// (SPECIFICATION §3). The LINE is a TSV row split by the host, exactly like a
+// grid row; only a VALUE is parsed here, through the grammar's own
+// directiveValue entry rule, so no reader splits directive text by hand and
+// every implementation refuses the same inputs.
+//
+// The value is written in the shape of a formula but is NOT the expression
+// language: a cell reference or a volatile call cannot appear, so value-driven
+// hiding cannot arrive through a directive while that design is still open.
 package tsvt
 
 import (
 	"strconv"
+	"strings"
 
 	"github.com/antlr4-go/antlr/v4"
 
@@ -14,92 +19,94 @@ import (
 	grammar "github.com/tsvsheet/go-tsvsheet/internal/grammar"
 )
 
-// SelectorText is the text of one directive value: `20-31,40`, `B-M`, or `1`.
-type SelectorText string
+// ValueText is the text of one directive value: `rows(range(20:31), count(3))`.
+type ValueText string
 
-// RowNumber is a 1-based physical row of the grid, as a directive writes it —
-// the same numbering the row gutter shows, not the engine's 0-based index.
-type RowNumber int
+// Axis names which way a directive value selects.
+type Axis int
 
-// ColumnLetters is an A1 column name (`B`, `AA`). Directive values carry the
-// letters rather than an index so the conversion stays in one place, beside
-// the address parsing that already owns it.
-type ColumnLetters string
+// The two axes a grid has, and the only two it will ever have.
+const (
+	AxisRow Axis = iota
+	AxisCol
+)
 
-// Count is a non-negative directive count: how many header or frozen rows or
-// columns a sheet declares. Zero declares none.
-type Count int
+// ItemKind distinguishes the two item forms. They are never interchangeable:
+// a range is absolute and shifts under a structural edit, a count is anchored
+// to an edge and re-resolves against it.
+type ItemKind int
 
-// RowSpan is an inclusive run of rows. A bare `40` parses as First == Last.
-type RowSpan struct {
-	First RowNumber
-	Last  RowNumber
+// The item forms, both always written out — neither is a default, so a bare
+// number can never be read as the wrong one.
+const (
+	ItemRange ItemKind = iota
+	ItemCount
+)
+
+// Offset is a position on either axis. A positive value counts from the start
+// (row 1, column A = 1); a negative value counts from the end, the convention
+// isnow established across this family, so -1 is the last row or column.
+type Offset int
+
+// Item is one selector in a directive value: a span (`range(20:31)`) or a
+// count of rows or columns at an edge (`count(3)`, `count(-1)`). For a count,
+// only First carries the number.
+type Item struct {
+	Kind  ItemKind
+	First Offset
+	Last  Offset
 }
 
-// ColSpan is an inclusive run of columns. A bare `N` parses as First == Last.
-type ColSpan struct {
-	First ColumnLetters
-	Last  ColumnLetters
+// DirectiveValue is a parsed axis call: which way it selects, and the items it
+// unions.
+type DirectiveValue struct {
+	Items []Item
+	Axis  Axis
 }
 
-// ParseRowSelector parses a row-axis directive value — a comma-separated list
-// of 1-based inclusive spans (`20-31,40`). Text the grammar does not admit is
-// constants.ErrSyntax; a span that parses but cannot mean anything (row zero,
-// a backwards run) is constants.ErrInvalidValue.
-func ParseRowSelector(src SelectorText) ([]RowSpan, error) {
+// funcName is a directive function's name as written — `rows`, `range`, or
+// whatever a reader typed instead.
+type funcName string
+
+// hintText is the spelling a diagnostic asks for, so the error teaches the
+// language rather than only refusing it.
+type hintText string
+
+// Directive function names. They resolve in this scope only — `=rows(...)` in
+// a cell is #NAME?, because a view is not something a formula may observe.
+const (
+	fnRows  funcName = "rows"
+	fnCols  funcName = "cols"
+	fnRange funcName = "range"
+	fnCount funcName = "count"
+)
+
+// ParseDirectiveValue parses one `#.` directive value. Text the grammar does
+// not admit is constants.ErrSyntax, carrying the spelling it wanted; text that
+// parses but cannot mean anything — an unknown function, an axis whose items
+// name the other axis, a descending span, a zero count — is
+// constants.ErrInvalidValue.
+func ParseDirectiveValue(src ValueText) (DirectiveValue, error) {
 	parser, sink := newValueParser(src)
-	tree := parser.RowSelector()
+	tree := parser.DirectiveValue()
 	if sink.err != nil {
-		return nil, sink.err
+		return DirectiveValue{}, adviseSyntax(src, sink.err)
 	}
-	spans := make([]RowSpan, 0, len(tree.AllRowSpan()))
-	for _, ctx := range tree.AllRowSpan() {
-		span, err := buildRowSpan(ctx)
-		if err != nil {
-			return nil, err
-		}
-		spans = append(spans, span)
+	axis, err := axisOf(funcName(tree.AxisCall().NAME().GetText()))
+	if err != nil {
+		return DirectiveValue{}, err
 	}
-	return spans, nil
-}
-
-// ParseColSelector parses a column-axis directive value — a comma-separated
-// list of inclusive column-letter spans (`B-M`, `A,C-D`). Errors follow
-// ParseRowSelector.
-func ParseColSelector(src SelectorText) ([]ColSpan, error) {
-	parser, sink := newValueParser(src)
-	tree := parser.ColSelector()
-	if sink.err != nil {
-		return nil, sink.err
+	items, err := buildItems(tree.AxisCall().ItemList().AllItem(), axis)
+	if err != nil {
+		return DirectiveValue{}, err
 	}
-	spans := make([]ColSpan, 0, len(tree.AllColSpan()))
-	for _, ctx := range tree.AllColSpan() {
-		span, err := buildColSpan(ctx)
-		if err != nil {
-			return nil, err
-		}
-		spans = append(spans, span)
-	}
-	return spans, nil
-}
-
-// ParseCount parses a count-valued directive value (`1`). A non-integer such
-// as `1.5` lexes as a number but cannot count rows, so it is
-// constants.ErrInvalidValue rather than a syntax error.
-func ParseCount(src SelectorText) (Count, error) {
-	parser, sink := newValueParser(src)
-	tree := parser.CountValue()
-	if sink.err != nil {
-		return 0, sink.err
-	}
-	n, err := wholeNumber(numberText(tree.NUMBER().GetText()))
-	return Count(n), err
+	return DirectiveValue{Axis: axis, Items: items}, nil
 }
 
 // newValueParser builds a parser over one directive value with the default
 // error listeners replaced by a collector, so a syntax error becomes
 // constants.ErrSyntax instead of a message printed to stderr.
-func newValueParser(src SelectorText) (*grammar.TsvsheetParser, *errorSink) {
+func newValueParser(src ValueText) (*grammar.TsvsheetParser, *errorSink) {
 	collector := &errorCollector{sink: &errorSink{}}
 
 	lexer := grammar.NewTsvsheetLexer(antlr.NewInputStream(string(src)))
@@ -113,60 +120,210 @@ func newValueParser(src SelectorText) (*grammar.TsvsheetParser, *errorSink) {
 	return parser, collector.sink
 }
 
-// buildRowSpan converts one parsed row span, rejecting row zero (rows are
-// 1-based) and a run that ends before it starts.
-func buildRowSpan(ctx grammar.IRowSpanContext) (RowSpan, error) {
-	numbers := ctx.AllNUMBER()
-	first, err := wholeNumber(numberText(numbers[0].GetText()))
-	if err != nil {
-		return RowSpan{}, err
+// adviseSyntax attaches the spelling the language wanted to a syntax error,
+// because the two refusals a reader hits most — a bare item and a bare or
+// comma-separated endpoint — are exactly the ones whose fix is not obvious.
+func adviseSyntax(src ValueText, err error) error {
+	if head, _, found := strings.Cut(string(src), "("); found && !isAxisName(funcName(head)) {
+		return constants.ErrSyntax.With(err, "value", string(src),
+			"hint", "a directive value selects an axis: rows(…) or cols(…)")
 	}
-	last := first
-	if len(numbers) > 1 {
-		if last, err = wholeNumber(numberText(numbers[1].GetText())); err != nil {
-			return RowSpan{}, err
+	for _, advice := range syntaxAdvice {
+		if strings.Contains(string(src), advice.when) {
+			return constants.ErrSyntax.With(err, "value", string(src), "hint", string(advice.say))
 		}
 	}
-	if first < 1 || last < first {
-		return RowSpan{}, constants.ErrInvalidValue.With(nil, "selector", ctx.GetText())
-	}
-	return RowSpan{First: RowNumber(first), Last: RowNumber(last)}, nil
+	return constants.ErrSyntax.With(err, "value", string(src))
 }
 
-// buildColSpan converts one parsed column span, rejecting a run whose columns
-// are in descending order (`M-B`).
-func buildColSpan(ctx grammar.IColSpanContext) (ColSpan, error) {
-	letters := ctx.AllCOL()
-	first := ColumnLetters(letters[0].GetText())
-	last := first
-	if len(letters) > 1 {
-		last = ColumnLetters(letters[1].GetText())
-	}
-	if !ordered(first, last) {
-		return ColSpan{}, constants.ErrInvalidValue.With(nil, "selector", ctx.GetText())
-	}
-	return ColSpan{First: first, Last: last}, nil
+// advice pairs a substring of the offending value with the spelling to suggest,
+// so the two refusals a reader hits most often carry their own fix.
+type advice struct {
+	when string
+	say  hintText
 }
 
-// ordered reports whether first names a column at or before last. A1 column
-// names sort by length first (`Z` precedes `AA`), then lexically.
-func ordered(first, last ColumnLetters) bool {
-	if len(first) != len(last) {
-		return len(first) < len(last)
+// syntaxAdvice is scanned in order: the more specific suggestion first.
+var syntaxAdvice = []advice{
+	{when: string(fnRange) + "(", say: "a range takes colon spans: range(20:31), and range(3:3) for one"},
+	{when: "(", say: "every item is a call: range(3:3) for one row or column, count(3) for the first three"},
+}
+
+// isAxisName reports whether a leading call name is one of the axes, so a
+// syntax error can say which spelling the value should have opened with.
+func isAxisName(name funcName) bool {
+	trimmed := funcName(strings.TrimSpace(string(name)))
+	return trimmed == fnRows || trimmed == fnCols
+}
+
+// axisOf resolves an axis function name, naming both spellings when it is not
+// one of them — an unknown name is a mistake worth a suggestion, not a bare
+// failure.
+func axisOf(name funcName) (Axis, error) {
+	switch name {
+	case fnRows:
+		return AxisRow, nil
+	case fnCols:
+		return AxisCol, nil
+	}
+	return 0, constants.ErrInvalidValue.With(nil,
+		"function", string(name), "hint", "a directive value selects an axis: rows(…) or cols(…)")
+}
+
+// buildItems converts each parsed item, checking it against the axis it was
+// written under so that a value naming the wrong axis is refused rather than
+// accepted and silently selecting nothing.
+func buildItems(parsed []grammar.IItemContext, axis Axis) ([]Item, error) {
+	items := make([]Item, 0, len(parsed))
+	for _, ctx := range parsed {
+		built, err := buildItem(ctx, axis)
+		if err != nil {
+			return nil, err
+		}
+		items = append(items, built...)
+	}
+	return items, nil
+}
+
+// buildItem converts one item. A range carrying several spans yields several
+// items, since each span selects independently and shifts on its own.
+func buildItem(ctx grammar.IItemContext, axis Axis) ([]Item, error) {
+	if call := ctx.CountCall(); call != nil {
+		item, err := buildCount(call)
+		return []Item{item}, err
+	}
+	return buildRange(ctx.RangeCall(), axis)
+}
+
+// buildCount converts `count(n)`. Zero selects nothing, which is likelier a
+// mistake than an intent: a directive that declares nothing is written by
+// omitting the line.
+func buildCount(ctx grammar.ICountCallContext) (Item, error) {
+	if name := funcName(ctx.NAME().GetText()); name != fnCount {
+		if name == fnRange {
+			// `range(40)` has a count's shape; say which spelling was meant.
+			n := ctx.Offset().GetText()
+			return Item{}, constants.ErrInvalidValue.With(nil, "item", ctx.GetText(),
+				"hint", "a range takes colon spans: range("+n+":"+n+")")
+		}
+		return Item{}, unknownItem(name)
+	}
+	n, err := offsetOf(ctx.Offset())
+	if err != nil {
+		return Item{}, err
+	}
+	return Item{Kind: ItemCount, First: n}, nil
+}
+
+// buildRange converts `range(a:b, …)`, validating every span against the axis
+// and for direction.
+func buildRange(ctx grammar.IRangeCallContext, axis Axis) ([]Item, error) {
+	if name := funcName(ctx.NAME().GetText()); name != fnRange {
+		return nil, unknownItem(name)
+	}
+	spans := ctx.AllSpan()
+	items := make([]Item, 0, len(spans))
+	for _, span := range spans {
+		item, err := spanItem(span, axis)
+		if err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+	return items, nil
+}
+
+// spanItem converts one `a:b` span, rejecting endpoints that name the other
+// axis and spans that resolve backwards.
+func spanItem(ctx grammar.ISpanContext, axis Axis) (Item, error) {
+	ends := ctx.AllEndpoint()
+	first, err := endpointOf(ends[0], axis)
+	if err != nil {
+		return Item{}, err
+	}
+	last, err := endpointOf(ends[1], axis)
+	if err != nil {
+		return Item{}, err
+	}
+	if !ascending(first, last) {
+		return Item{}, constants.ErrInvalidValue.With(nil,
+			"span", ctx.GetText(), "hint", "a span runs forwards: range(20:31)")
+	}
+	return Item{Kind: ItemRange, First: first, Last: last}, nil
+}
+
+// ascending reports whether a span runs forwards. Two offsets compare directly
+// only when they are anchored to the same end; a positive start with a
+// negative end always runs forwards, since it ends at or before the last.
+func ascending(first, last Offset) bool {
+	if (first < 0) != (last < 0) {
+		return first > 0
 	}
 	return first <= last
 }
 
-// numberText is the source text of a NUMBER token — `20`, or the `1.5` the
-// token also admits and a count cannot mean.
-type numberText string
-
-// wholeNumber converts a NUMBER token's text to an integer, rejecting the
-// fractional form the token also admits.
-func wholeNumber(text numberText) (int, error) {
-	n, err := strconv.Atoi(string(text))
-	if err != nil {
-		return 0, constants.ErrInvalidValue.With(err, "number", string(text))
+// endpointOf converts one span endpoint. A column letter suits only the column
+// axis and a plain number only the row axis, but a NEGATIVE number suits
+// either: it counts from the end, which both axes have.
+func endpointOf(ctx grammar.IEndpointContext, axis Axis) (Offset, error) {
+	if col := ctx.COL(); col != nil {
+		if axis != AxisCol {
+			return 0, wrongAxis(endpointText(ctx.GetText()), "rows are numbered: range(20:31)")
+		}
+		return columnOffset(endpointText(ctx.GetText())), nil
+	}
+	n, err := offsetOf(ctx.Offset())
+	if err != nil || n < 0 {
+		return n, err
+	}
+	if axis == AxisCol {
+		return 0, wrongAxis(endpointText(ctx.GetText()), "columns are lettered: range(B:M)")
 	}
 	return n, nil
+}
+
+// offsetOf converts a signed number, rejecting the fractional form the NUMBER
+// token also admits and a zero position (both axes are 1-based).
+func offsetOf(ctx grammar.IOffsetContext) (Offset, error) {
+	n, err := strconv.Atoi(ctx.NUMBER().GetText())
+	if err != nil {
+		return 0, constants.ErrInvalidValue.With(err, "number", ctx.GetText())
+	}
+	if n == 0 {
+		// Zero is no position on either axis, and `-0` is not one either — a
+		// negative offset counts back from the last, where -1 is already the end.
+		return 0, constants.ErrInvalidValue.With(nil,
+			"position", ctx.GetText(), "hint", "rows and columns are numbered from 1, or from -1 at the end")
+	}
+	if ctx.DASH() != nil {
+		return Offset(-n), nil
+	}
+	return Offset(n), nil
+}
+
+// endpointText is one endpoint as written — `20`, `-1`, or `B` — carried into
+// a diagnostic so the reader sees the part that was wrong.
+type endpointText string
+
+// columnOffset converts A1 column letters to a 1-based position, so that the
+// column axis compares and shifts exactly like the row axis.
+func columnOffset(letters endpointText) Offset {
+	n := 0
+	for _, r := range string(letters) {
+		n = n*26 + int(r-'A') + 1
+	}
+	return Offset(n)
+}
+
+// unknownItem reports a function name that is not one of the item forms,
+// naming both so the message teaches the language.
+func unknownItem(name funcName) error {
+	return constants.ErrInvalidValue.With(nil,
+		"function", string(name), "hint", "an item is range(20:31) or count(3)")
+}
+
+// wrongAxis reports an endpoint written for the other axis, with the spelling
+// the axis wanted.
+func wrongAxis(text endpointText, hint hintText) error {
+	return constants.ErrInvalidValue.With(nil, "endpoint", string(text), "hint", string(hint))
 }

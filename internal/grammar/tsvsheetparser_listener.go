@@ -67,20 +67,32 @@ type TsvsheetParserListener interface {
 	// EnterCellRef is called when entering the cellRef production.
 	EnterCellRef(c *CellRefContext)
 
-	// EnterRowSelector is called when entering the rowSelector production.
-	EnterRowSelector(c *RowSelectorContext)
+	// EnterDirectiveValue is called when entering the directiveValue production.
+	EnterDirectiveValue(c *DirectiveValueContext)
 
-	// EnterColSelector is called when entering the colSelector production.
-	EnterColSelector(c *ColSelectorContext)
+	// EnterAxisCall is called when entering the axisCall production.
+	EnterAxisCall(c *AxisCallContext)
 
-	// EnterCountValue is called when entering the countValue production.
-	EnterCountValue(c *CountValueContext)
+	// EnterItemList is called when entering the itemList production.
+	EnterItemList(c *ItemListContext)
 
-	// EnterRowSpan is called when entering the rowSpan production.
-	EnterRowSpan(c *RowSpanContext)
+	// EnterItem is called when entering the item production.
+	EnterItem(c *ItemContext)
 
-	// EnterColSpan is called when entering the colSpan production.
-	EnterColSpan(c *ColSpanContext)
+	// EnterRangeCall is called when entering the rangeCall production.
+	EnterRangeCall(c *RangeCallContext)
+
+	// EnterCountCall is called when entering the countCall production.
+	EnterCountCall(c *CountCallContext)
+
+	// EnterSpan is called when entering the span production.
+	EnterSpan(c *SpanContext)
+
+	// EnterEndpoint is called when entering the endpoint production.
+	EnterEndpoint(c *EndpointContext)
+
+	// EnterOffset is called when entering the offset production.
+	EnterOffset(c *OffsetContext)
 
 	// ExitErrorExpr is called when exiting the errorExpr production.
 	ExitErrorExpr(c *ErrorExprContext)
@@ -142,18 +154,30 @@ type TsvsheetParserListener interface {
 	// ExitCellRef is called when exiting the cellRef production.
 	ExitCellRef(c *CellRefContext)
 
-	// ExitRowSelector is called when exiting the rowSelector production.
-	ExitRowSelector(c *RowSelectorContext)
+	// ExitDirectiveValue is called when exiting the directiveValue production.
+	ExitDirectiveValue(c *DirectiveValueContext)
 
-	// ExitColSelector is called when exiting the colSelector production.
-	ExitColSelector(c *ColSelectorContext)
+	// ExitAxisCall is called when exiting the axisCall production.
+	ExitAxisCall(c *AxisCallContext)
 
-	// ExitCountValue is called when exiting the countValue production.
-	ExitCountValue(c *CountValueContext)
+	// ExitItemList is called when exiting the itemList production.
+	ExitItemList(c *ItemListContext)
 
-	// ExitRowSpan is called when exiting the rowSpan production.
-	ExitRowSpan(c *RowSpanContext)
+	// ExitItem is called when exiting the item production.
+	ExitItem(c *ItemContext)
 
-	// ExitColSpan is called when exiting the colSpan production.
-	ExitColSpan(c *ColSpanContext)
+	// ExitRangeCall is called when exiting the rangeCall production.
+	ExitRangeCall(c *RangeCallContext)
+
+	// ExitCountCall is called when exiting the countCall production.
+	ExitCountCall(c *CountCallContext)
+
+	// ExitSpan is called when exiting the span production.
+	ExitSpan(c *SpanContext)
+
+	// ExitEndpoint is called when exiting the endpoint production.
+	ExitEndpoint(c *EndpointContext)
+
+	// ExitOffset is called when exiting the offset production.
+	ExitOffset(c *OffsetContext)
 }
