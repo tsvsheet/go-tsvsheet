@@ -164,6 +164,21 @@ func TestResolveView(t *testing.T) {
 			get: func(v engine.View) engine.Selection { return v.HeaderRows },
 		},
 		{
+			name: "freeze accepts a range anchored at the first row", src: "#.freeze\trows(range(1:2))\n",
+			ext: engine.Extent{Rows: 10, Cols: 5}, want: []int{1, 2},
+			get: func(v engine.View) engine.Selection { return v.FreezeRows },
+		},
+		{
+			name: "freeze accepts a range anchored at the last row", src: "#.freeze\trows(range(-2:-1))\n",
+			ext: engine.Extent{Rows: 10, Cols: 5}, want: []int{9, 10},
+			get: func(v engine.View) engine.Selection { return v.FreezeRows },
+		},
+		{
+			name: "freeze accepts a column range anchored at A", src: "#.freeze\tcols(range(A:B))\n",
+			ext: engine.Extent{Rows: 10, Cols: 5}, want: []int{1, 2},
+			get: func(v engine.View) engine.Selection { return v.FreezeCols },
+		},
+		{
 			name: "a count from the end larger than the grid clamps", src: "#.freeze\trows(count(-99))\n",
 			ext: engine.Extent{Rows: 3, Cols: 5}, want: []int{1, 2, 3},
 			get: func(v engine.View) engine.Selection { return v.FreezeRows },

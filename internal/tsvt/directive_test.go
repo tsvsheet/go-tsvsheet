@@ -28,7 +28,7 @@ func TestParseDirectiveValue(t *testing.T) {
 			text: "cols(range(B:M))",
 			want: tsvt.DirectiveValue{
 				Axis:  tsvt.AxisCol,
-				Items: []tsvt.Item{{Kind: tsvt.ItemRange, First: tsvt.Offset(2), Last: tsvt.Offset(13)}},
+				Items: []tsvt.Item{{Kind: tsvt.ItemRange, Spans: []tsvt.Span{{First: 2, Last: 13}}}},
 			},
 		},
 		{
@@ -36,7 +36,7 @@ func TestParseDirectiveValue(t *testing.T) {
 			text: "rows(range(20:31))",
 			want: tsvt.DirectiveValue{
 				Axis:  tsvt.AxisRow,
-				Items: []tsvt.Item{{Kind: tsvt.ItemRange, First: tsvt.Offset(20), Last: tsvt.Offset(31)}},
+				Items: []tsvt.Item{{Kind: tsvt.ItemRange, Spans: []tsvt.Span{{First: 20, Last: 31}}}},
 			},
 		},
 		{
@@ -44,7 +44,7 @@ func TestParseDirectiveValue(t *testing.T) {
 			text: "rows(range(40:40))",
 			want: tsvt.DirectiveValue{
 				Axis:  tsvt.AxisRow,
-				Items: []tsvt.Item{{Kind: tsvt.ItemRange, First: tsvt.Offset(40), Last: tsvt.Offset(40)}},
+				Items: []tsvt.Item{{Kind: tsvt.ItemRange, Spans: []tsvt.Span{{First: 40, Last: 40}}}},
 			},
 		},
 		{
@@ -53,8 +53,7 @@ func TestParseDirectiveValue(t *testing.T) {
 			want: tsvt.DirectiveValue{
 				Axis: tsvt.AxisRow,
 				Items: []tsvt.Item{
-					{Kind: tsvt.ItemRange, First: tsvt.Offset(20), Last: tsvt.Offset(31)},
-					{Kind: tsvt.ItemRange, First: tsvt.Offset(40), Last: tsvt.Offset(40)},
+					{Kind: tsvt.ItemRange, Spans: []tsvt.Span{{First: 20, Last: 31}, {First: 40, Last: 40}}},
 				},
 			},
 		},
@@ -63,7 +62,7 @@ func TestParseDirectiveValue(t *testing.T) {
 			text: "rows(count(3))",
 			want: tsvt.DirectiveValue{
 				Axis:  tsvt.AxisRow,
-				Items: []tsvt.Item{{Kind: tsvt.ItemCount, First: tsvt.Offset(3)}},
+				Items: []tsvt.Item{{Kind: tsvt.ItemCount, Count: 3}},
 			},
 		},
 		{
@@ -71,7 +70,7 @@ func TestParseDirectiveValue(t *testing.T) {
 			text: "rows(count(-1))",
 			want: tsvt.DirectiveValue{
 				Axis:  tsvt.AxisRow,
-				Items: []tsvt.Item{{Kind: tsvt.ItemCount, First: tsvt.Offset(-1)}},
+				Items: []tsvt.Item{{Kind: tsvt.ItemCount, Count: -1}},
 			},
 		},
 		{
@@ -79,7 +78,7 @@ func TestParseDirectiveValue(t *testing.T) {
 			text: "rows(range(20:-1))",
 			want: tsvt.DirectiveValue{
 				Axis:  tsvt.AxisRow,
-				Items: []tsvt.Item{{Kind: tsvt.ItemRange, First: tsvt.Offset(20), Last: tsvt.Offset(-1)}},
+				Items: []tsvt.Item{{Kind: tsvt.ItemRange, Spans: []tsvt.Span{{First: 20, Last: -1}}}},
 			},
 		},
 		{
@@ -87,7 +86,7 @@ func TestParseDirectiveValue(t *testing.T) {
 			text: "rows(range(-1:-1))",
 			want: tsvt.DirectiveValue{
 				Axis:  tsvt.AxisRow,
-				Items: []tsvt.Item{{Kind: tsvt.ItemRange, First: tsvt.Offset(-1), Last: tsvt.Offset(-1)}},
+				Items: []tsvt.Item{{Kind: tsvt.ItemRange, Spans: []tsvt.Span{{First: -1, Last: -1}}}},
 			},
 		},
 		{
@@ -96,8 +95,8 @@ func TestParseDirectiveValue(t *testing.T) {
 			want: tsvt.DirectiveValue{
 				Axis: tsvt.AxisRow,
 				Items: []tsvt.Item{
-					{Kind: tsvt.ItemCount, First: tsvt.Offset(2)},
-					{Kind: tsvt.ItemCount, First: tsvt.Offset(-1)},
+					{Kind: tsvt.ItemCount, Count: 2},
+					{Kind: tsvt.ItemCount, Count: -1},
 				},
 			},
 		},
@@ -106,7 +105,7 @@ func TestParseDirectiveValue(t *testing.T) {
 			text: "cols(range(B:-1))",
 			want: tsvt.DirectiveValue{
 				Axis:  tsvt.AxisCol,
-				Items: []tsvt.Item{{Kind: tsvt.ItemRange, First: tsvt.Offset(2), Last: tsvt.Offset(-1)}},
+				Items: []tsvt.Item{{Kind: tsvt.ItemRange, Spans: []tsvt.Span{{First: 2, Last: -1}}}},
 			},
 		},
 		{
@@ -114,7 +113,7 @@ func TestParseDirectiveValue(t *testing.T) {
 			text: "cols(range(Z:AA))",
 			want: tsvt.DirectiveValue{
 				Axis:  tsvt.AxisCol,
-				Items: []tsvt.Item{{Kind: tsvt.ItemRange, First: tsvt.Offset(26), Last: tsvt.Offset(27)}},
+				Items: []tsvt.Item{{Kind: tsvt.ItemRange, Spans: []tsvt.Span{{First: 26, Last: 27}}}},
 			},
 		},
 		{
@@ -123,8 +122,8 @@ func TestParseDirectiveValue(t *testing.T) {
 			want: tsvt.DirectiveValue{
 				Axis: tsvt.AxisRow,
 				Items: []tsvt.Item{
-					{Kind: tsvt.ItemRange, First: tsvt.Offset(20), Last: tsvt.Offset(31)},
-					{Kind: tsvt.ItemCount, First: tsvt.Offset(3)},
+					{Kind: tsvt.ItemRange, Spans: []tsvt.Span{{First: 20, Last: 31}}},
+					{Kind: tsvt.ItemCount, Count: 3},
 				},
 			},
 		},

@@ -48,13 +48,20 @@ const (
 // isnow established across this family, so -1 is the last row or column.
 type Offset int
 
-// Item is one selector in a directive value: a span (`range(20:31)`) or a
-// count of rows or columns at an edge (`count(3)`, `count(-1)`). For a count,
-// only First carries the number.
-type Item struct {
-	Kind  ItemKind
+// Span is one inclusive run inside a range call.
+type Span struct {
 	First Offset
 	Last  Offset
+}
+
+// Item is one selector in a directive value: a range call carrying one or more
+// spans (`range(20:31, 40:40)`), or a count at an edge (`count(3)`). The spans
+// of one call stay together so a rewrite can shift endpoints without regrouping
+// what the author wrote.
+type Item struct {
+	Spans []Span
+	Count Offset
+	Kind  ItemKind
 }
 
 // DirectiveValue is a parsed axis call: which way it selects, and the items it
@@ -180,17 +187,15 @@ func buildItems(parsed []grammar.IItemContext, axis Axis) ([]Item, error) {
 		if err != nil {
 			return nil, err
 		}
-		items = append(items, built...)
+		items = append(items, built)
 	}
 	return items, nil
 }
 
-// buildItem converts one item. A range carrying several spans yields several
-// items, since each span selects independently and shifts on its own.
-func buildItem(ctx grammar.IItemContext, axis Axis) ([]Item, error) {
+// buildItem converts one item — a count, or a range with all of its spans.
+func buildItem(ctx grammar.IItemContext, axis Axis) (Item, error) {
 	if call := ctx.CountCall(); call != nil {
-		item, err := buildCount(call)
-		return []Item{item}, err
+		return buildCount(call)
 	}
 	return buildRange(ctx.RangeCall(), axis)
 }
@@ -212,44 +217,44 @@ func buildCount(ctx grammar.ICountCallContext) (Item, error) {
 	if err != nil {
 		return Item{}, err
 	}
-	return Item{Kind: ItemCount, First: n}, nil
+	return Item{Kind: ItemCount, Count: n}, nil
 }
 
 // buildRange converts `range(a:b, …)`, validating every span against the axis
 // and for direction.
-func buildRange(ctx grammar.IRangeCallContext, axis Axis) ([]Item, error) {
+func buildRange(ctx grammar.IRangeCallContext, axis Axis) (Item, error) {
 	if name := funcName(ctx.NAME().GetText()); name != fnRange {
-		return nil, unknownItem(name)
+		return Item{}, unknownItem(name)
 	}
-	spans := ctx.AllSpan()
-	items := make([]Item, 0, len(spans))
-	for _, span := range spans {
-		item, err := spanItem(span, axis)
+	parsed := ctx.AllSpan()
+	spans := make([]Span, 0, len(parsed))
+	for _, ctx := range parsed {
+		span, err := buildSpan(ctx, axis)
 		if err != nil {
-			return nil, err
+			return Item{}, err
 		}
-		items = append(items, item)
+		spans = append(spans, span)
 	}
-	return items, nil
+	return Item{Kind: ItemRange, Spans: spans}, nil
 }
 
-// spanItem converts one `a:b` span, rejecting endpoints that name the other
-// axis and spans that resolve backwards.
-func spanItem(ctx grammar.ISpanContext, axis Axis) (Item, error) {
+// buildSpan converts one `a:b` span, rejecting endpoints that name the other
+// axis and spans that run backwards as written.
+func buildSpan(ctx grammar.ISpanContext, axis Axis) (Span, error) {
 	ends := ctx.AllEndpoint()
 	first, err := endpointOf(ends[0], axis)
 	if err != nil {
-		return Item{}, err
+		return Span{}, err
 	}
 	last, err := endpointOf(ends[1], axis)
 	if err != nil {
-		return Item{}, err
+		return Span{}, err
 	}
 	if !ascending(first, last) {
-		return Item{}, constants.ErrInvalidValue.With(nil,
+		return Span{}, constants.ErrInvalidValue.With(nil,
 			"span", ctx.GetText(), "hint", "a span runs forwards: range(20:31)")
 	}
-	return Item{Kind: ItemRange, First: first, Last: last}, nil
+	return Span{First: first, Last: last}, nil
 }
 
 // ascending reports whether a span runs forwards. Two offsets compare directly

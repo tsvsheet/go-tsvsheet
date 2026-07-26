@@ -155,7 +155,7 @@ func directiveOf(key, value fieldText, at LineNumber) (Directive, error) {
 // does; a range must start at the first position or end at the last.
 func freezeTouchesEdge(v tsvt.DirectiveValue) error {
 	for _, item := range v.Items {
-		if item.Kind == tsvt.ItemCount || item.First == 1 || item.Last == -1 {
+		if item.Kind == tsvt.ItemCount || spansTouchEdge(item.Spans) {
 			continue
 		}
 		return constants.ErrInvalidValue.With(nil, "hint",
@@ -164,24 +164,59 @@ func freezeTouchesEdge(v tsvt.DirectiveValue) error {
 	return nil
 }
 
+// spansTouchEdge reports whether every span of a range reaches an edge — the
+// first position, or the last.
+func spansTouchEdge(spans []tsvt.Span) bool {
+	for _, s := range spans {
+		if s.First != 1 && s.Last != -1 {
+			return false
+		}
+	}
+	return true
+}
+
 // ResolveView derives the view from directives and the grid's extent. Items
 // union; an item naming positions the grid does not have selects nothing,
 // because ambiguity in a view resolves toward showing more data, never less.
 func ResolveView(ds []Directive, ext Extent) (View, []Diagnostic) {
 	view := newView()
-	var diags []Diagnostic
+	diags := make([]Diagnostic, 0, len(ds))
 	for _, d := range ds {
 		into, size := view.target(d, ext)
-		for _, item := range d.Value.Items {
-			first, last, isForwards := resolveItem(item, size)
-			if !isForwards {
-				diags = append(diags, lineDiag(d.At, "this selects nothing: it runs backwards once resolved"))
-				continue
-			}
-			selectSpan(into, first, last, size)
-		}
+		diags = append(diags, resolveInto(into, d, size)...)
 	}
 	return view, diags
+}
+
+// resolveInto adds one directive's items to a selection, reporting the spans
+// that run backwards only once their edge-anchored endpoints are substituted.
+func resolveInto(into Selection, d Directive, size axisSize) []Diagnostic {
+	diags := make([]Diagnostic, 0, len(d.Value.Items))
+	for _, item := range d.Value.Items {
+		if item.Kind == tsvt.ItemCount {
+			first, last := resolveCount(item.Count, size)
+			selectSpan(into, first, last, size)
+			continue
+		}
+		diags = append(diags, selectSpans(into, item.Spans, d.At, size)...)
+	}
+	return diags
+}
+
+// selectSpans adds one range call's spans, reporting each that runs backwards
+// only after its edge-anchored endpoint is substituted against a grid too small
+// for it — that span selects nothing, and says so rather than reversing.
+func selectSpans(into Selection, spans []tsvt.Span, at LineNumber, size axisSize) []Diagnostic {
+	diags := make([]Diagnostic, 0, len(spans))
+	for _, span := range spans {
+		first, last := resolvePos(span.First, size), resolvePos(span.Last, size)
+		if last < first {
+			diags = append(diags, lineDiag(at, "this selects nothing: it runs backwards once resolved"))
+			continue
+		}
+		selectSpan(into, first, last, size)
+	}
+	return diags
 }
 
 // newView allocates every selection so a caller never distinguishes "no
@@ -209,24 +244,13 @@ func (v View) target(d Directive, ext Extent) (Selection, axisSize) {
 	return byKey[d.Key][1], axisSize(ext.Cols)
 }
 
-// resolveItem turns one item into an inclusive 1-based span against the
-// extent, reporting false when it runs backwards once the edge-anchored
-// endpoints are substituted.
-func resolveItem(item tsvt.Item, size axisSize) (first, last position, isForwards bool) {
-	if item.Kind == tsvt.ItemCount {
-		return resolveCount(item.First, size)
-	}
-	first, last = resolvePos(item.First, size), resolvePos(item.Last, size)
-	return first, last, first <= last
-}
-
 // resolveCount turns `count(n)` into a span at the near edge for a positive n
 // and at the far edge for a negative one.
-func resolveCount(n tsvt.Offset, size axisSize) (first, last position, isForwards bool) {
+func resolveCount(n tsvt.Offset, size axisSize) (first, last position) {
 	if n > 0 {
-		return 1, position(n), true
+		return 1, position(n)
 	}
-	return position(size) + position(n) + 1, position(size), true
+	return position(size) + position(n) + 1, position(size)
 }
 
 // resolvePos substitutes an endpoint: positive positions stand as written,
