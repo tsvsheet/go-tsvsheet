@@ -8,6 +8,8 @@ package engine
 import (
 	"bytes"
 	"strings"
+
+	"github.com/tsvsheet/go-tsvsheet/internal/tsvt"
 )
 
 // docLine is one physical line of the source: either a comment/shebang line
@@ -90,7 +92,10 @@ func (d Document) InsertRow(at Address) Document {
 	if len(sheet.cells) == len(d.sheet.cells) {
 		return d
 	}
-	return Document{sheet: sheet, layout: spliceMarker(d.layout, rowIndex(min(at.Row, len(d.sheet.cells))))}
+	moved := Document{sheet: sheet, layout: spliceMarker(d.layout, rowIndex(min(at.Row, len(d.sheet.cells))))}
+	return moved.shiftDirectives(directiveEdit{
+		axis: tsvt.AxisRow, at: offsetOfRow(gridIndex(at.Row)), size: tsvt.Offset(len(d.sheet.cells)),
+	})
 }
 
 // DeleteRow returns a new document with row at.Row removed (Sheet.DeleteRow
@@ -103,7 +108,10 @@ func (d Document) DeleteRow(at Address) Document {
 	idx := markerIndex(d.layout, rowIndex(at.Row))
 	layout := make([]docLine, 0, len(d.layout)-1)
 	layout = append(layout, d.layout[:idx]...)
-	return Document{sheet: sheet, layout: append(layout, d.layout[idx+1:]...)}
+	moved := Document{sheet: sheet, layout: append(layout, d.layout[idx+1:]...)}
+	return moved.shiftDirectives(directiveEdit{
+		axis: tsvt.AxisRow, at: offsetOfRow(gridIndex(at.Row)), size: tsvt.Offset(len(d.sheet.cells)), isRemoval: true,
+	})
 }
 
 // Fill returns a new document with Sheet.Fill applied; rows the grid grew by
@@ -135,14 +143,27 @@ func (d Document) DuplicateCol(at Address) Document {
 // InsertCol returns a new document with a blank column inserted before at.Col;
 // column operations never touch the line layout.
 func (d Document) InsertCol(at Address) Document {
-	return Document{sheet: d.sheet.InsertCol(at), layout: d.layout}
+	moved := Document{sheet: d.sheet.InsertCol(at), layout: d.layout}
+	return moved.shiftDirectives(directiveEdit{
+		axis: tsvt.AxisCol, at: offsetOfRow(gridIndex(at.Col)), size: tsvt.Offset(d.Extent().Cols),
+	})
 }
 
 // DeleteCol returns a new document with column at.Col removed; column
 // operations never touch the line layout.
 func (d Document) DeleteCol(at Address) Document {
-	return Document{sheet: d.sheet.DeleteCol(at), layout: d.layout}
+	moved := Document{sheet: d.sheet.DeleteCol(at), layout: d.layout}
+	return moved.shiftDirectives(directiveEdit{
+		axis: tsvt.AxisCol, at: offsetOfRow(gridIndex(at.Col)), size: tsvt.Offset(d.Extent().Cols), isRemoval: true,
+	})
 }
+
+// gridIndex is a 0-based row or column index, as the grid stores it.
+type gridIndex int
+
+// offsetOfRow converts a 0-based grid index to the 1-based position a directive
+// writes, which is the numbering a reader sees in the gutter.
+func offsetOfRow(index gridIndex) tsvt.Offset { return tsvt.Offset(index + 1) }
 
 // appendMarkers appends grown row markers to a copy of the layout.
 func appendMarkers(layout []docLine, grown rowIndex) []docLine {
