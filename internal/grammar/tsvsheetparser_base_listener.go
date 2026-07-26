@@ -139,3 +139,33 @@ func (s *BaseTsvsheetParserListener) EnterCellRef(ctx *CellRefContext) {}
 
 // ExitCellRef is called when production cellRef is exited.
 func (s *BaseTsvsheetParserListener) ExitCellRef(ctx *CellRefContext) {}
+
+// EnterRowSelector is called when production rowSelector is entered.
+func (s *BaseTsvsheetParserListener) EnterRowSelector(ctx *RowSelectorContext) {}
+
+// ExitRowSelector is called when production rowSelector is exited.
+func (s *BaseTsvsheetParserListener) ExitRowSelector(ctx *RowSelectorContext) {}
+
+// EnterColSelector is called when production colSelector is entered.
+func (s *BaseTsvsheetParserListener) EnterColSelector(ctx *ColSelectorContext) {}
+
+// ExitColSelector is called when production colSelector is exited.
+func (s *BaseTsvsheetParserListener) ExitColSelector(ctx *ColSelectorContext) {}
+
+// EnterCountValue is called when production countValue is entered.
+func (s *BaseTsvsheetParserListener) EnterCountValue(ctx *CountValueContext) {}
+
+// ExitCountValue is called when production countValue is exited.
+func (s *BaseTsvsheetParserListener) ExitCountValue(ctx *CountValueContext) {}
+
+// EnterRowSpan is called when production rowSpan is entered.
+func (s *BaseTsvsheetParserListener) EnterRowSpan(ctx *RowSpanContext) {}
+
+// ExitRowSpan is called when production rowSpan is exited.
+func (s *BaseTsvsheetParserListener) ExitRowSpan(ctx *RowSpanContext) {}
+
+// EnterColSpan is called when production colSpan is entered.
+func (s *BaseTsvsheetParserListener) EnterColSpan(ctx *ColSpanContext) {}
+
+// ExitColSpan is called when production colSpan is exited.
+func (s *BaseTsvsheetParserListener) ExitColSpan(ctx *ColSpanContext) {}

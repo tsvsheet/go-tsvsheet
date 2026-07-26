@@ -67,6 +67,21 @@ type TsvsheetParserListener interface {
 	// EnterCellRef is called when entering the cellRef production.
 	EnterCellRef(c *CellRefContext)
 
+	// EnterRowSelector is called when entering the rowSelector production.
+	EnterRowSelector(c *RowSelectorContext)
+
+	// EnterColSelector is called when entering the colSelector production.
+	EnterColSelector(c *ColSelectorContext)
+
+	// EnterCountValue is called when entering the countValue production.
+	EnterCountValue(c *CountValueContext)
+
+	// EnterRowSpan is called when entering the rowSpan production.
+	EnterRowSpan(c *RowSpanContext)
+
+	// EnterColSpan is called when entering the colSpan production.
+	EnterColSpan(c *ColSpanContext)
+
 	// ExitErrorExpr is called when exiting the errorExpr production.
 	ExitErrorExpr(c *ErrorExprContext)
 
@@ -126,4 +141,19 @@ type TsvsheetParserListener interface {
 
 	// ExitCellRef is called when exiting the cellRef production.
 	ExitCellRef(c *CellRefContext)
+
+	// ExitRowSelector is called when exiting the rowSelector production.
+	ExitRowSelector(c *RowSelectorContext)
+
+	// ExitColSelector is called when exiting the colSelector production.
+	ExitColSelector(c *ColSelectorContext)
+
+	// ExitCountValue is called when exiting the countValue production.
+	ExitCountValue(c *CountValueContext)
+
+	// ExitRowSpan is called when exiting the rowSpan production.
+	ExitRowSpan(c *RowSpanContext)
+
+	// ExitColSpan is called when exiting the colSpan production.
+	ExitColSpan(c *ColSpanContext)
 }

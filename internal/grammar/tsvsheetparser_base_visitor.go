@@ -86,3 +86,23 @@ func (v *BaseTsvsheetParserVisitor) VisitSheetQualifier(ctx *SheetQualifierConte
 func (v *BaseTsvsheetParserVisitor) VisitCellRef(ctx *CellRefContext) interface{} {
 	return v.VisitChildren(ctx)
 }
+
+func (v *BaseTsvsheetParserVisitor) VisitRowSelector(ctx *RowSelectorContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseTsvsheetParserVisitor) VisitColSelector(ctx *ColSelectorContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseTsvsheetParserVisitor) VisitCountValue(ctx *CountValueContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseTsvsheetParserVisitor) VisitRowSpan(ctx *RowSpanContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseTsvsheetParserVisitor) VisitColSpan(ctx *ColSpanContext) interface{} {
+	return v.VisitChildren(ctx)
+}

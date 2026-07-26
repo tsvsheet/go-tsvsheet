@@ -44,52 +44,69 @@ func tsvsheetparserParserInit() {
 	}
 	staticData.RuleNames = []string{
 		"expression", "functionCall", "argList", "reference", "sheetQualifier",
-		"cellRef",
+		"cellRef", "rowSelector", "colSelector", "countValue", "rowSpan", "colSpan",
 	}
 	staticData.PredictionContextCache = antlr.NewPredictionContextCache()
 	staticData.serializedATN = []int32{
-		4, 1, 28, 93, 2, 0, 7, 0, 2, 1, 7, 1, 2, 2, 7, 2, 2, 3, 7, 3, 2, 4, 7,
-		4, 2, 5, 7, 5, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1,
-		0, 1, 0, 1, 0, 1, 0, 3, 0, 26, 8, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0,
+		4, 1, 28, 136, 2, 0, 7, 0, 2, 1, 7, 1, 2, 2, 7, 2, 2, 3, 7, 3, 2, 4, 7,
+		4, 2, 5, 7, 5, 2, 6, 7, 6, 2, 7, 7, 7, 2, 8, 7, 8, 2, 9, 7, 9, 2, 10, 7,
+		10, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1,
+		0, 1, 0, 3, 0, 36, 8, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0,
 		1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0,
-		1, 0, 1, 0, 5, 0, 48, 8, 0, 10, 0, 12, 0, 51, 9, 0, 1, 1, 1, 1, 3, 1, 55,
-		8, 1, 1, 1, 1, 1, 3, 1, 59, 8, 1, 1, 1, 1, 1, 3, 1, 63, 8, 1, 1, 2, 1,
-		2, 1, 2, 5, 2, 68, 8, 2, 10, 2, 12, 2, 71, 9, 2, 1, 3, 3, 3, 74, 8, 3,
-		1, 3, 1, 3, 1, 3, 3, 3, 79, 8, 3, 1, 4, 1, 4, 1, 4, 1, 5, 3, 5, 85, 8,
-		5, 1, 5, 1, 5, 3, 5, 89, 8, 5, 1, 5, 1, 5, 1, 5, 0, 1, 0, 6, 0, 2, 4, 6,
-		8, 10, 0, 5, 1, 0, 16, 17, 1, 0, 6, 7, 2, 0, 15, 15, 18, 18, 2, 0, 1, 5,
-		9, 9, 1, 0, 25, 26, 108, 0, 25, 1, 0, 0, 0, 2, 62, 1, 0, 0, 0, 4, 64, 1,
-		0, 0, 0, 6, 73, 1, 0, 0, 0, 8, 80, 1, 0, 0, 0, 10, 84, 1, 0, 0, 0, 12,
-		13, 6, 0, -1, 0, 13, 14, 5, 10, 0, 0, 14, 15, 3, 0, 0, 0, 15, 16, 5, 11,
-		0, 0, 16, 26, 1, 0, 0, 0, 17, 18, 7, 0, 0, 0, 18, 26, 3, 0, 0, 12, 19,
-		26, 3, 2, 1, 0, 20, 26, 3, 6, 3, 0, 21, 26, 5, 24, 0, 0, 22, 26, 5, 27,
-		0, 0, 23, 26, 7, 1, 0, 0, 24, 26, 5, 8, 0, 0, 25, 12, 1, 0, 0, 0, 25, 17,
-		1, 0, 0, 0, 25, 19, 1, 0, 0, 0, 25, 20, 1, 0, 0, 0, 25, 21, 1, 0, 0, 0,
-		25, 22, 1, 0, 0, 0, 25, 23, 1, 0, 0, 0, 25, 24, 1, 0, 0, 0, 26, 49, 1,
-		0, 0, 0, 27, 28, 10, 13, 0, 0, 28, 29, 5, 20, 0, 0, 29, 48, 3, 0, 0, 13,
-		30, 31, 10, 11, 0, 0, 31, 32, 7, 2, 0, 0, 32, 48, 3, 0, 0, 12, 33, 34,
-		10, 10, 0, 0, 34, 35, 7, 0, 0, 0, 35, 48, 3, 0, 0, 11, 36, 37, 10, 9, 0,
-		0, 37, 38, 5, 21, 0, 0, 38, 48, 3, 0, 0, 10, 39, 40, 10, 8, 0, 0, 40, 41,
-		7, 3, 0, 0, 41, 48, 3, 0, 0, 9, 42, 43, 10, 14, 0, 0, 43, 48, 5, 19, 0,
-		0, 44, 45, 10, 7, 0, 0, 45, 46, 5, 23, 0, 0, 46, 48, 3, 2, 1, 0, 47, 27,
-		1, 0, 0, 0, 47, 30, 1, 0, 0, 0, 47, 33, 1, 0, 0, 0, 47, 36, 1, 0, 0, 0,
-		47, 39, 1, 0, 0, 0, 47, 42, 1, 0, 0, 0, 47, 44, 1, 0, 0, 0, 48, 51, 1,
-		0, 0, 0, 49, 47, 1, 0, 0, 0, 49, 50, 1, 0, 0, 0, 50, 1, 1, 0, 0, 0, 51,
-		49, 1, 0, 0, 0, 52, 54, 7, 4, 0, 0, 53, 55, 5, 24, 0, 0, 54, 53, 1, 0,
-		0, 0, 54, 55, 1, 0, 0, 0, 55, 56, 1, 0, 0, 0, 56, 58, 5, 10, 0, 0, 57,
-		59, 3, 4, 2, 0, 58, 57, 1, 0, 0, 0, 58, 59, 1, 0, 0, 0, 59, 60, 1, 0, 0,
-		0, 60, 63, 5, 11, 0, 0, 61, 63, 7, 4, 0, 0, 62, 52, 1, 0, 0, 0, 62, 61,
-		1, 0, 0, 0, 63, 3, 1, 0, 0, 0, 64, 69, 3, 0, 0, 0, 65, 66, 5, 13, 0, 0,
-		66, 68, 3, 0, 0, 0, 67, 65, 1, 0, 0, 0, 68, 71, 1, 0, 0, 0, 69, 67, 1,
-		0, 0, 0, 69, 70, 1, 0, 0, 0, 70, 5, 1, 0, 0, 0, 71, 69, 1, 0, 0, 0, 72,
-		74, 3, 8, 4, 0, 73, 72, 1, 0, 0, 0, 73, 74, 1, 0, 0, 0, 74, 75, 1, 0, 0,
-		0, 75, 78, 3, 10, 5, 0, 76, 77, 5, 12, 0, 0, 77, 79, 3, 10, 5, 0, 78, 76,
-		1, 0, 0, 0, 78, 79, 1, 0, 0, 0, 79, 7, 1, 0, 0, 0, 80, 81, 5, 27, 0, 0,
-		81, 82, 5, 22, 0, 0, 82, 9, 1, 0, 0, 0, 83, 85, 5, 14, 0, 0, 84, 83, 1,
-		0, 0, 0, 84, 85, 1, 0, 0, 0, 85, 86, 1, 0, 0, 0, 86, 88, 5, 25, 0, 0, 87,
-		89, 5, 14, 0, 0, 88, 87, 1, 0, 0, 0, 88, 89, 1, 0, 0, 0, 89, 90, 1, 0,
-		0, 0, 90, 91, 5, 24, 0, 0, 91, 11, 1, 0, 0, 0, 11, 25, 47, 49, 54, 58,
-		62, 69, 73, 78, 84, 88,
+		5, 0, 58, 8, 0, 10, 0, 12, 0, 61, 9, 0, 1, 1, 1, 1, 3, 1, 65, 8, 1, 1,
+		1, 1, 1, 3, 1, 69, 8, 1, 1, 1, 1, 1, 3, 1, 73, 8, 1, 1, 2, 1, 2, 1, 2,
+		5, 2, 78, 8, 2, 10, 2, 12, 2, 81, 9, 2, 1, 3, 3, 3, 84, 8, 3, 1, 3, 1,
+		3, 1, 3, 3, 3, 89, 8, 3, 1, 4, 1, 4, 1, 4, 1, 5, 3, 5, 95, 8, 5, 1, 5,
+		1, 5, 3, 5, 99, 8, 5, 1, 5, 1, 5, 1, 6, 1, 6, 1, 6, 5, 6, 106, 8, 6, 10,
+		6, 12, 6, 109, 9, 6, 1, 6, 1, 6, 1, 7, 1, 7, 1, 7, 5, 7, 116, 8, 7, 10,
+		7, 12, 7, 119, 9, 7, 1, 7, 1, 7, 1, 8, 1, 8, 1, 8, 1, 9, 1, 9, 1, 9, 3,
+		9, 129, 8, 9, 1, 10, 1, 10, 1, 10, 3, 10, 134, 8, 10, 1, 10, 0, 1, 0, 11,
+		0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 0, 5, 1, 0, 16, 17, 1, 0, 6, 7,
+		2, 0, 15, 15, 18, 18, 2, 0, 1, 5, 9, 9, 1, 0, 25, 26, 150, 0, 35, 1, 0,
+		0, 0, 2, 72, 1, 0, 0, 0, 4, 74, 1, 0, 0, 0, 6, 83, 1, 0, 0, 0, 8, 90, 1,
+		0, 0, 0, 10, 94, 1, 0, 0, 0, 12, 102, 1, 0, 0, 0, 14, 112, 1, 0, 0, 0,
+		16, 122, 1, 0, 0, 0, 18, 125, 1, 0, 0, 0, 20, 130, 1, 0, 0, 0, 22, 23,
+		6, 0, -1, 0, 23, 24, 5, 10, 0, 0, 24, 25, 3, 0, 0, 0, 25, 26, 5, 11, 0,
+		0, 26, 36, 1, 0, 0, 0, 27, 28, 7, 0, 0, 0, 28, 36, 3, 0, 0, 12, 29, 36,
+		3, 2, 1, 0, 30, 36, 3, 6, 3, 0, 31, 36, 5, 24, 0, 0, 32, 36, 5, 27, 0,
+		0, 33, 36, 7, 1, 0, 0, 34, 36, 5, 8, 0, 0, 35, 22, 1, 0, 0, 0, 35, 27,
+		1, 0, 0, 0, 35, 29, 1, 0, 0, 0, 35, 30, 1, 0, 0, 0, 35, 31, 1, 0, 0, 0,
+		35, 32, 1, 0, 0, 0, 35, 33, 1, 0, 0, 0, 35, 34, 1, 0, 0, 0, 36, 59, 1,
+		0, 0, 0, 37, 38, 10, 13, 0, 0, 38, 39, 5, 20, 0, 0, 39, 58, 3, 0, 0, 13,
+		40, 41, 10, 11, 0, 0, 41, 42, 7, 2, 0, 0, 42, 58, 3, 0, 0, 12, 43, 44,
+		10, 10, 0, 0, 44, 45, 7, 0, 0, 0, 45, 58, 3, 0, 0, 11, 46, 47, 10, 9, 0,
+		0, 47, 48, 5, 21, 0, 0, 48, 58, 3, 0, 0, 10, 49, 50, 10, 8, 0, 0, 50, 51,
+		7, 3, 0, 0, 51, 58, 3, 0, 0, 9, 52, 53, 10, 14, 0, 0, 53, 58, 5, 19, 0,
+		0, 54, 55, 10, 7, 0, 0, 55, 56, 5, 23, 0, 0, 56, 58, 3, 2, 1, 0, 57, 37,
+		1, 0, 0, 0, 57, 40, 1, 0, 0, 0, 57, 43, 1, 0, 0, 0, 57, 46, 1, 0, 0, 0,
+		57, 49, 1, 0, 0, 0, 57, 52, 1, 0, 0, 0, 57, 54, 1, 0, 0, 0, 58, 61, 1,
+		0, 0, 0, 59, 57, 1, 0, 0, 0, 59, 60, 1, 0, 0, 0, 60, 1, 1, 0, 0, 0, 61,
+		59, 1, 0, 0, 0, 62, 64, 7, 4, 0, 0, 63, 65, 5, 24, 0, 0, 64, 63, 1, 0,
+		0, 0, 64, 65, 1, 0, 0, 0, 65, 66, 1, 0, 0, 0, 66, 68, 5, 10, 0, 0, 67,
+		69, 3, 4, 2, 0, 68, 67, 1, 0, 0, 0, 68, 69, 1, 0, 0, 0, 69, 70, 1, 0, 0,
+		0, 70, 73, 5, 11, 0, 0, 71, 73, 7, 4, 0, 0, 72, 62, 1, 0, 0, 0, 72, 71,
+		1, 0, 0, 0, 73, 3, 1, 0, 0, 0, 74, 79, 3, 0, 0, 0, 75, 76, 5, 13, 0, 0,
+		76, 78, 3, 0, 0, 0, 77, 75, 1, 0, 0, 0, 78, 81, 1, 0, 0, 0, 79, 77, 1,
+		0, 0, 0, 79, 80, 1, 0, 0, 0, 80, 5, 1, 0, 0, 0, 81, 79, 1, 0, 0, 0, 82,
+		84, 3, 8, 4, 0, 83, 82, 1, 0, 0, 0, 83, 84, 1, 0, 0, 0, 84, 85, 1, 0, 0,
+		0, 85, 88, 3, 10, 5, 0, 86, 87, 5, 12, 0, 0, 87, 89, 3, 10, 5, 0, 88, 86,
+		1, 0, 0, 0, 88, 89, 1, 0, 0, 0, 89, 7, 1, 0, 0, 0, 90, 91, 5, 27, 0, 0,
+		91, 92, 5, 22, 0, 0, 92, 9, 1, 0, 0, 0, 93, 95, 5, 14, 0, 0, 94, 93, 1,
+		0, 0, 0, 94, 95, 1, 0, 0, 0, 95, 96, 1, 0, 0, 0, 96, 98, 5, 25, 0, 0, 97,
+		99, 5, 14, 0, 0, 98, 97, 1, 0, 0, 0, 98, 99, 1, 0, 0, 0, 99, 100, 1, 0,
+		0, 0, 100, 101, 5, 24, 0, 0, 101, 11, 1, 0, 0, 0, 102, 107, 3, 18, 9, 0,
+		103, 104, 5, 13, 0, 0, 104, 106, 3, 18, 9, 0, 105, 103, 1, 0, 0, 0, 106,
+		109, 1, 0, 0, 0, 107, 105, 1, 0, 0, 0, 107, 108, 1, 0, 0, 0, 108, 110,
+		1, 0, 0, 0, 109, 107, 1, 0, 0, 0, 110, 111, 5, 0, 0, 1, 111, 13, 1, 0,
+		0, 0, 112, 117, 3, 20, 10, 0, 113, 114, 5, 13, 0, 0, 114, 116, 3, 20, 10,
+		0, 115, 113, 1, 0, 0, 0, 116, 119, 1, 0, 0, 0, 117, 115, 1, 0, 0, 0, 117,
+		118, 1, 0, 0, 0, 118, 120, 1, 0, 0, 0, 119, 117, 1, 0, 0, 0, 120, 121,
+		5, 0, 0, 1, 121, 15, 1, 0, 0, 0, 122, 123, 5, 24, 0, 0, 123, 124, 5, 0,
+		0, 1, 124, 17, 1, 0, 0, 0, 125, 128, 5, 24, 0, 0, 126, 127, 5, 17, 0, 0,
+		127, 129, 5, 24, 0, 0, 128, 126, 1, 0, 0, 0, 128, 129, 1, 0, 0, 0, 129,
+		19, 1, 0, 0, 0, 130, 133, 5, 25, 0, 0, 131, 132, 5, 17, 0, 0, 132, 134,
+		5, 25, 0, 0, 133, 131, 1, 0, 0, 0, 133, 134, 1, 0, 0, 0, 134, 21, 1, 0,
+		0, 0, 15, 35, 57, 59, 64, 68, 72, 79, 83, 88, 94, 98, 107, 117, 128, 133,
 	}
 	deserializer := antlr.NewATNDeserializer(nil)
 	staticData.atn = deserializer.Deserialize(staticData.serializedATN)
@@ -166,6 +183,11 @@ const (
 	TsvsheetParserRULE_reference      = 3
 	TsvsheetParserRULE_sheetQualifier = 4
 	TsvsheetParserRULE_cellRef        = 5
+	TsvsheetParserRULE_rowSelector    = 6
+	TsvsheetParserRULE_colSelector    = 7
+	TsvsheetParserRULE_countValue     = 8
+	TsvsheetParserRULE_rowSpan        = 9
+	TsvsheetParserRULE_colSpan        = 10
 )
 
 // IExpressionContext is an interface to support dynamic dispatch.
@@ -1269,7 +1291,7 @@ func (p *TsvsheetParser) expression(_p int) (localctx IExpressionContext) {
 	var _alt int
 
 	p.EnterOuterAlt(localctx, 1)
-	p.SetState(25)
+	p.SetState(35)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
 		goto errorExit
@@ -1282,7 +1304,7 @@ func (p *TsvsheetParser) expression(_p int) (localctx IExpressionContext) {
 		_prevctx = localctx
 
 		{
-			p.SetState(13)
+			p.SetState(23)
 			p.Match(TsvsheetParserLPAREN)
 			if p.HasError() {
 				// Recognition error - abort rule
@@ -1290,11 +1312,11 @@ func (p *TsvsheetParser) expression(_p int) (localctx IExpressionContext) {
 			}
 		}
 		{
-			p.SetState(14)
+			p.SetState(24)
 			p.expression(0)
 		}
 		{
-			p.SetState(15)
+			p.SetState(25)
 			p.Match(TsvsheetParserRPAREN)
 			if p.HasError() {
 				// Recognition error - abort rule
@@ -1307,7 +1329,7 @@ func (p *TsvsheetParser) expression(_p int) (localctx IExpressionContext) {
 		p.SetParserRuleContext(localctx)
 		_prevctx = localctx
 		{
-			p.SetState(17)
+			p.SetState(27)
 
 			var _lt = p.GetTokenStream().LT(1)
 
@@ -1325,7 +1347,7 @@ func (p *TsvsheetParser) expression(_p int) (localctx IExpressionContext) {
 			}
 		}
 		{
-			p.SetState(18)
+			p.SetState(28)
 			p.expression(12)
 		}
 
@@ -1334,7 +1356,7 @@ func (p *TsvsheetParser) expression(_p int) (localctx IExpressionContext) {
 		p.SetParserRuleContext(localctx)
 		_prevctx = localctx
 		{
-			p.SetState(19)
+			p.SetState(29)
 			p.FunctionCall()
 		}
 
@@ -1343,7 +1365,7 @@ func (p *TsvsheetParser) expression(_p int) (localctx IExpressionContext) {
 		p.SetParserRuleContext(localctx)
 		_prevctx = localctx
 		{
-			p.SetState(20)
+			p.SetState(30)
 			p.Reference()
 		}
 
@@ -1352,7 +1374,7 @@ func (p *TsvsheetParser) expression(_p int) (localctx IExpressionContext) {
 		p.SetParserRuleContext(localctx)
 		_prevctx = localctx
 		{
-			p.SetState(21)
+			p.SetState(31)
 			p.Match(TsvsheetParserNUMBER)
 			if p.HasError() {
 				// Recognition error - abort rule
@@ -1365,7 +1387,7 @@ func (p *TsvsheetParser) expression(_p int) (localctx IExpressionContext) {
 		p.SetParserRuleContext(localctx)
 		_prevctx = localctx
 		{
-			p.SetState(22)
+			p.SetState(32)
 			p.Match(TsvsheetParserSTRING)
 			if p.HasError() {
 				// Recognition error - abort rule
@@ -1378,7 +1400,7 @@ func (p *TsvsheetParser) expression(_p int) (localctx IExpressionContext) {
 		p.SetParserRuleContext(localctx)
 		_prevctx = localctx
 		{
-			p.SetState(23)
+			p.SetState(33)
 			_la = p.GetTokenStream().LA(1)
 
 			if !(_la == TsvsheetParserTRUE || _la == TsvsheetParserFALSE) {
@@ -1394,7 +1416,7 @@ func (p *TsvsheetParser) expression(_p int) (localctx IExpressionContext) {
 		p.SetParserRuleContext(localctx)
 		_prevctx = localctx
 		{
-			p.SetState(24)
+			p.SetState(34)
 			p.Match(TsvsheetParserERRORCONST)
 			if p.HasError() {
 				// Recognition error - abort rule
@@ -1406,7 +1428,7 @@ func (p *TsvsheetParser) expression(_p int) (localctx IExpressionContext) {
 		goto errorExit
 	}
 	p.GetParserRuleContext().SetStop(p.GetTokenStream().LT(-1))
-	p.SetState(49)
+	p.SetState(59)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
 		goto errorExit
@@ -1421,7 +1443,7 @@ func (p *TsvsheetParser) expression(_p int) (localctx IExpressionContext) {
 				p.TriggerExitRuleEvent()
 			}
 			_prevctx = localctx
-			p.SetState(47)
+			p.SetState(57)
 			p.GetErrorHandler().Sync(p)
 			if p.HasError() {
 				goto errorExit
@@ -1431,14 +1453,14 @@ func (p *TsvsheetParser) expression(_p int) (localctx IExpressionContext) {
 			case 1:
 				localctx = NewPowExprContext(p, NewExpressionContext(p, _parentctx, _parentState))
 				p.PushNewRecursionContext(localctx, _startState, TsvsheetParserRULE_expression)
-				p.SetState(27)
+				p.SetState(37)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 13)) {
 					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 13)", ""))
 					goto errorExit
 				}
 				{
-					p.SetState(28)
+					p.SetState(38)
 					p.Match(TsvsheetParserCARET)
 					if p.HasError() {
 						// Recognition error - abort rule
@@ -1446,21 +1468,21 @@ func (p *TsvsheetParser) expression(_p int) (localctx IExpressionContext) {
 					}
 				}
 				{
-					p.SetState(29)
+					p.SetState(39)
 					p.expression(13)
 				}
 
 			case 2:
 				localctx = NewMulExprContext(p, NewExpressionContext(p, _parentctx, _parentState))
 				p.PushNewRecursionContext(localctx, _startState, TsvsheetParserRULE_expression)
-				p.SetState(30)
+				p.SetState(40)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 11)) {
 					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 11)", ""))
 					goto errorExit
 				}
 				{
-					p.SetState(31)
+					p.SetState(41)
 
 					var _lt = p.GetTokenStream().LT(1)
 
@@ -1478,21 +1500,21 @@ func (p *TsvsheetParser) expression(_p int) (localctx IExpressionContext) {
 					}
 				}
 				{
-					p.SetState(32)
+					p.SetState(42)
 					p.expression(12)
 				}
 
 			case 3:
 				localctx = NewAddExprContext(p, NewExpressionContext(p, _parentctx, _parentState))
 				p.PushNewRecursionContext(localctx, _startState, TsvsheetParserRULE_expression)
-				p.SetState(33)
+				p.SetState(43)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 10)) {
 					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 10)", ""))
 					goto errorExit
 				}
 				{
-					p.SetState(34)
+					p.SetState(44)
 
 					var _lt = p.GetTokenStream().LT(1)
 
@@ -1510,21 +1532,21 @@ func (p *TsvsheetParser) expression(_p int) (localctx IExpressionContext) {
 					}
 				}
 				{
-					p.SetState(35)
+					p.SetState(45)
 					p.expression(11)
 				}
 
 			case 4:
 				localctx = NewConcatExprContext(p, NewExpressionContext(p, _parentctx, _parentState))
 				p.PushNewRecursionContext(localctx, _startState, TsvsheetParserRULE_expression)
-				p.SetState(36)
+				p.SetState(46)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 9)) {
 					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 9)", ""))
 					goto errorExit
 				}
 				{
-					p.SetState(37)
+					p.SetState(47)
 					p.Match(TsvsheetParserAMP)
 					if p.HasError() {
 						// Recognition error - abort rule
@@ -1532,21 +1554,21 @@ func (p *TsvsheetParser) expression(_p int) (localctx IExpressionContext) {
 					}
 				}
 				{
-					p.SetState(38)
+					p.SetState(48)
 					p.expression(10)
 				}
 
 			case 5:
 				localctx = NewCompareExprContext(p, NewExpressionContext(p, _parentctx, _parentState))
 				p.PushNewRecursionContext(localctx, _startState, TsvsheetParserRULE_expression)
-				p.SetState(39)
+				p.SetState(49)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 8)) {
 					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 8)", ""))
 					goto errorExit
 				}
 				{
-					p.SetState(40)
+					p.SetState(50)
 
 					var _lt = p.GetTokenStream().LT(1)
 
@@ -1564,21 +1586,21 @@ func (p *TsvsheetParser) expression(_p int) (localctx IExpressionContext) {
 					}
 				}
 				{
-					p.SetState(41)
+					p.SetState(51)
 					p.expression(9)
 				}
 
 			case 6:
 				localctx = NewPercentExprContext(p, NewExpressionContext(p, _parentctx, _parentState))
 				p.PushNewRecursionContext(localctx, _startState, TsvsheetParserRULE_expression)
-				p.SetState(42)
+				p.SetState(52)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 14)) {
 					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 14)", ""))
 					goto errorExit
 				}
 				{
-					p.SetState(43)
+					p.SetState(53)
 					p.Match(TsvsheetParserPERCENT)
 					if p.HasError() {
 						// Recognition error - abort rule
@@ -1589,14 +1611,14 @@ func (p *TsvsheetParser) expression(_p int) (localctx IExpressionContext) {
 			case 7:
 				localctx = NewPipeExprContext(p, NewExpressionContext(p, _parentctx, _parentState))
 				p.PushNewRecursionContext(localctx, _startState, TsvsheetParserRULE_expression)
-				p.SetState(44)
+				p.SetState(54)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 7)) {
 					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 7)", ""))
 					goto errorExit
 				}
 				{
-					p.SetState(45)
+					p.SetState(55)
 					p.Match(TsvsheetParserPIPE)
 					if p.HasError() {
 						// Recognition error - abort rule
@@ -1604,7 +1626,7 @@ func (p *TsvsheetParser) expression(_p int) (localctx IExpressionContext) {
 					}
 				}
 				{
-					p.SetState(46)
+					p.SetState(56)
 					p.FunctionCall()
 				}
 
@@ -1613,7 +1635,7 @@ func (p *TsvsheetParser) expression(_p int) (localctx IExpressionContext) {
 			}
 
 		}
-		p.SetState(51)
+		p.SetState(61)
 		p.GetErrorHandler().Sync(p)
 		if p.HasError() {
 			goto errorExit
@@ -1759,7 +1781,7 @@ func (p *TsvsheetParser) FunctionCall() (localctx IFunctionCallContext) {
 	p.EnterRule(localctx, 2, TsvsheetParserRULE_functionCall)
 	var _la int
 
-	p.SetState(62)
+	p.SetState(72)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
 		goto errorExit
@@ -1769,7 +1791,7 @@ func (p *TsvsheetParser) FunctionCall() (localctx IFunctionCallContext) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
-			p.SetState(52)
+			p.SetState(62)
 			_la = p.GetTokenStream().LA(1)
 
 			if !(_la == TsvsheetParserCOL || _la == TsvsheetParserNAME) {
@@ -1779,7 +1801,7 @@ func (p *TsvsheetParser) FunctionCall() (localctx IFunctionCallContext) {
 				p.Consume()
 			}
 		}
-		p.SetState(54)
+		p.SetState(64)
 		p.GetErrorHandler().Sync(p)
 		if p.HasError() {
 			goto errorExit
@@ -1788,7 +1810,7 @@ func (p *TsvsheetParser) FunctionCall() (localctx IFunctionCallContext) {
 
 		if _la == TsvsheetParserNUMBER {
 			{
-				p.SetState(53)
+				p.SetState(63)
 				p.Match(TsvsheetParserNUMBER)
 				if p.HasError() {
 					// Recognition error - abort rule
@@ -1798,14 +1820,14 @@ func (p *TsvsheetParser) FunctionCall() (localctx IFunctionCallContext) {
 
 		}
 		{
-			p.SetState(56)
+			p.SetState(66)
 			p.Match(TsvsheetParserLPAREN)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
 			}
 		}
-		p.SetState(58)
+		p.SetState(68)
 		p.GetErrorHandler().Sync(p)
 		if p.HasError() {
 			goto errorExit
@@ -1814,13 +1836,13 @@ func (p *TsvsheetParser) FunctionCall() (localctx IFunctionCallContext) {
 
 		if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&251872704) != 0 {
 			{
-				p.SetState(57)
+				p.SetState(67)
 				p.ArgList()
 			}
 
 		}
 		{
-			p.SetState(60)
+			p.SetState(70)
 			p.Match(TsvsheetParserRPAREN)
 			if p.HasError() {
 				// Recognition error - abort rule
@@ -1831,7 +1853,7 @@ func (p *TsvsheetParser) FunctionCall() (localctx IFunctionCallContext) {
 	case 2:
 		p.EnterOuterAlt(localctx, 2)
 		{
-			p.SetState(61)
+			p.SetState(71)
 			_la = p.GetTokenStream().LA(1)
 
 			if !(_la == TsvsheetParserCOL || _la == TsvsheetParserNAME) {
@@ -1994,10 +2016,10 @@ func (p *TsvsheetParser) ArgList() (localctx IArgListContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(64)
+		p.SetState(74)
 		p.expression(0)
 	}
-	p.SetState(69)
+	p.SetState(79)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
 		goto errorExit
@@ -2006,7 +2028,7 @@ func (p *TsvsheetParser) ArgList() (localctx IArgListContext) {
 
 	for _la == TsvsheetParserCOMMA {
 		{
-			p.SetState(65)
+			p.SetState(75)
 			p.Match(TsvsheetParserCOMMA)
 			if p.HasError() {
 				// Recognition error - abort rule
@@ -2014,11 +2036,11 @@ func (p *TsvsheetParser) ArgList() (localctx IArgListContext) {
 			}
 		}
 		{
-			p.SetState(66)
+			p.SetState(76)
 			p.expression(0)
 		}
 
-		p.SetState(71)
+		p.SetState(81)
 		p.GetErrorHandler().Sync(p)
 		if p.HasError() {
 			goto errorExit
@@ -2185,7 +2207,7 @@ func (p *TsvsheetParser) Reference() (localctx IReferenceContext) {
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
-	p.SetState(73)
+	p.SetState(83)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
 		goto errorExit
@@ -2194,21 +2216,21 @@ func (p *TsvsheetParser) Reference() (localctx IReferenceContext) {
 
 	if _la == TsvsheetParserSTRING {
 		{
-			p.SetState(72)
+			p.SetState(82)
 			p.SheetQualifier()
 		}
 
 	}
 	{
-		p.SetState(75)
+		p.SetState(85)
 		p.CellRef()
 	}
-	p.SetState(78)
+	p.SetState(88)
 	p.GetErrorHandler().Sync(p)
 
 	if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 8, p.GetParserRuleContext()) == 1 {
 		{
-			p.SetState(76)
+			p.SetState(86)
 			p.Match(TsvsheetParserCOLON)
 			if p.HasError() {
 				// Recognition error - abort rule
@@ -2216,7 +2238,7 @@ func (p *TsvsheetParser) Reference() (localctx IReferenceContext) {
 			}
 		}
 		{
-			p.SetState(77)
+			p.SetState(87)
 			p.CellRef()
 		}
 
@@ -2327,7 +2349,7 @@ func (p *TsvsheetParser) SheetQualifier() (localctx ISheetQualifierContext) {
 	p.EnterRule(localctx, 8, TsvsheetParserRULE_sheetQualifier)
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(80)
+		p.SetState(90)
 		p.Match(TsvsheetParserSTRING)
 		if p.HasError() {
 			// Recognition error - abort rule
@@ -2335,7 +2357,7 @@ func (p *TsvsheetParser) SheetQualifier() (localctx ISheetQualifierContext) {
 		}
 	}
 	{
-		p.SetState(81)
+		p.SetState(91)
 		p.Match(TsvsheetParserBANG)
 		if p.HasError() {
 			// Recognition error - abort rule
@@ -2457,7 +2479,7 @@ func (p *TsvsheetParser) CellRef() (localctx ICellRefContext) {
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
-	p.SetState(84)
+	p.SetState(94)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
 		goto errorExit
@@ -2466,7 +2488,7 @@ func (p *TsvsheetParser) CellRef() (localctx ICellRefContext) {
 
 	if _la == TsvsheetParserDOLLAR {
 		{
-			p.SetState(83)
+			p.SetState(93)
 			p.Match(TsvsheetParserDOLLAR)
 			if p.HasError() {
 				// Recognition error - abort rule
@@ -2476,14 +2498,14 @@ func (p *TsvsheetParser) CellRef() (localctx ICellRefContext) {
 
 	}
 	{
-		p.SetState(86)
+		p.SetState(96)
 		p.Match(TsvsheetParserCOL)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
 		}
 	}
-	p.SetState(88)
+	p.SetState(98)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
 		goto errorExit
@@ -2492,7 +2514,7 @@ func (p *TsvsheetParser) CellRef() (localctx ICellRefContext) {
 
 	if _la == TsvsheetParserDOLLAR {
 		{
-			p.SetState(87)
+			p.SetState(97)
 			p.Match(TsvsheetParserDOLLAR)
 			if p.HasError() {
 				// Recognition error - abort rule
@@ -2502,12 +2524,805 @@ func (p *TsvsheetParser) CellRef() (localctx ICellRefContext) {
 
 	}
 	{
-		p.SetState(90)
+		p.SetState(100)
 		p.Match(TsvsheetParserNUMBER)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
 		}
+	}
+
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
+	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
+}
+
+// IRowSelectorContext is an interface to support dynamic dispatch.
+type IRowSelectorContext interface {
+	antlr.ParserRuleContext
+
+	// GetParser returns the parser.
+	GetParser() antlr.Parser
+
+	// Getter signatures
+	AllRowSpan() []IRowSpanContext
+	RowSpan(i int) IRowSpanContext
+	EOF() antlr.TerminalNode
+	AllCOMMA() []antlr.TerminalNode
+	COMMA(i int) antlr.TerminalNode
+
+	// IsRowSelectorContext differentiates from other interfaces.
+	IsRowSelectorContext()
+}
+
+type RowSelectorContext struct {
+	antlr.BaseParserRuleContext
+	parser antlr.Parser
+}
+
+func NewEmptyRowSelectorContext() *RowSelectorContext {
+	var p = new(RowSelectorContext)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = TsvsheetParserRULE_rowSelector
+	return p
+}
+
+func InitEmptyRowSelectorContext(p *RowSelectorContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = TsvsheetParserRULE_rowSelector
+}
+
+func (*RowSelectorContext) IsRowSelectorContext() {}
+
+func NewRowSelectorContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *RowSelectorContext {
+	var p = new(RowSelectorContext)
+
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
+
+	p.parser = parser
+	p.RuleIndex = TsvsheetParserRULE_rowSelector
+
+	return p
+}
+
+func (s *RowSelectorContext) GetParser() antlr.Parser { return s.parser }
+
+func (s *RowSelectorContext) AllRowSpan() []IRowSpanContext {
+	children := s.GetChildren()
+	len := 0
+	for _, ctx := range children {
+		if _, ok := ctx.(IRowSpanContext); ok {
+			len++
+		}
+	}
+
+	tst := make([]IRowSpanContext, len)
+	i := 0
+	for _, ctx := range children {
+		if t, ok := ctx.(IRowSpanContext); ok {
+			tst[i] = t.(IRowSpanContext)
+			i++
+		}
+	}
+
+	return tst
+}
+
+func (s *RowSelectorContext) RowSpan(i int) IRowSpanContext {
+	var t antlr.RuleContext
+	j := 0
+	for _, ctx := range s.GetChildren() {
+		if _, ok := ctx.(IRowSpanContext); ok {
+			if j == i {
+				t = ctx.(antlr.RuleContext)
+				break
+			}
+			j++
+		}
+	}
+
+	if t == nil {
+		return nil
+	}
+
+	return t.(IRowSpanContext)
+}
+
+func (s *RowSelectorContext) EOF() antlr.TerminalNode {
+	return s.GetToken(TsvsheetParserEOF, 0)
+}
+
+func (s *RowSelectorContext) AllCOMMA() []antlr.TerminalNode {
+	return s.GetTokens(TsvsheetParserCOMMA)
+}
+
+func (s *RowSelectorContext) COMMA(i int) antlr.TerminalNode {
+	return s.GetToken(TsvsheetParserCOMMA, i)
+}
+
+func (s *RowSelectorContext) GetRuleContext() antlr.RuleContext {
+	return s
+}
+
+func (s *RowSelectorContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
+	return antlr.TreesStringTree(s, ruleNames, recog)
+}
+
+func (s *RowSelectorContext) EnterRule(listener antlr.ParseTreeListener) {
+	if listenerT, ok := listener.(TsvsheetParserListener); ok {
+		listenerT.EnterRowSelector(s)
+	}
+}
+
+func (s *RowSelectorContext) ExitRule(listener antlr.ParseTreeListener) {
+	if listenerT, ok := listener.(TsvsheetParserListener); ok {
+		listenerT.ExitRowSelector(s)
+	}
+}
+
+func (s *RowSelectorContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
+	switch t := visitor.(type) {
+	case TsvsheetParserVisitor:
+		return t.VisitRowSelector(s)
+
+	default:
+		return t.VisitChildren(s)
+	}
+}
+
+func (p *TsvsheetParser) RowSelector() (localctx IRowSelectorContext) {
+	localctx = NewRowSelectorContext(p, p.GetParserRuleContext(), p.GetState())
+	p.EnterRule(localctx, 12, TsvsheetParserRULE_rowSelector)
+	var _la int
+
+	p.EnterOuterAlt(localctx, 1)
+	{
+		p.SetState(102)
+		p.RowSpan()
+	}
+	p.SetState(107)
+	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
+	_la = p.GetTokenStream().LA(1)
+
+	for _la == TsvsheetParserCOMMA {
+		{
+			p.SetState(103)
+			p.Match(TsvsheetParserCOMMA)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
+		}
+		{
+			p.SetState(104)
+			p.RowSpan()
+		}
+
+		p.SetState(109)
+		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
+		_la = p.GetTokenStream().LA(1)
+	}
+	{
+		p.SetState(110)
+		p.Match(TsvsheetParserEOF)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
+	}
+
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
+	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
+}
+
+// IColSelectorContext is an interface to support dynamic dispatch.
+type IColSelectorContext interface {
+	antlr.ParserRuleContext
+
+	// GetParser returns the parser.
+	GetParser() antlr.Parser
+
+	// Getter signatures
+	AllColSpan() []IColSpanContext
+	ColSpan(i int) IColSpanContext
+	EOF() antlr.TerminalNode
+	AllCOMMA() []antlr.TerminalNode
+	COMMA(i int) antlr.TerminalNode
+
+	// IsColSelectorContext differentiates from other interfaces.
+	IsColSelectorContext()
+}
+
+type ColSelectorContext struct {
+	antlr.BaseParserRuleContext
+	parser antlr.Parser
+}
+
+func NewEmptyColSelectorContext() *ColSelectorContext {
+	var p = new(ColSelectorContext)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = TsvsheetParserRULE_colSelector
+	return p
+}
+
+func InitEmptyColSelectorContext(p *ColSelectorContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = TsvsheetParserRULE_colSelector
+}
+
+func (*ColSelectorContext) IsColSelectorContext() {}
+
+func NewColSelectorContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ColSelectorContext {
+	var p = new(ColSelectorContext)
+
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
+
+	p.parser = parser
+	p.RuleIndex = TsvsheetParserRULE_colSelector
+
+	return p
+}
+
+func (s *ColSelectorContext) GetParser() antlr.Parser { return s.parser }
+
+func (s *ColSelectorContext) AllColSpan() []IColSpanContext {
+	children := s.GetChildren()
+	len := 0
+	for _, ctx := range children {
+		if _, ok := ctx.(IColSpanContext); ok {
+			len++
+		}
+	}
+
+	tst := make([]IColSpanContext, len)
+	i := 0
+	for _, ctx := range children {
+		if t, ok := ctx.(IColSpanContext); ok {
+			tst[i] = t.(IColSpanContext)
+			i++
+		}
+	}
+
+	return tst
+}
+
+func (s *ColSelectorContext) ColSpan(i int) IColSpanContext {
+	var t antlr.RuleContext
+	j := 0
+	for _, ctx := range s.GetChildren() {
+		if _, ok := ctx.(IColSpanContext); ok {
+			if j == i {
+				t = ctx.(antlr.RuleContext)
+				break
+			}
+			j++
+		}
+	}
+
+	if t == nil {
+		return nil
+	}
+
+	return t.(IColSpanContext)
+}
+
+func (s *ColSelectorContext) EOF() antlr.TerminalNode {
+	return s.GetToken(TsvsheetParserEOF, 0)
+}
+
+func (s *ColSelectorContext) AllCOMMA() []antlr.TerminalNode {
+	return s.GetTokens(TsvsheetParserCOMMA)
+}
+
+func (s *ColSelectorContext) COMMA(i int) antlr.TerminalNode {
+	return s.GetToken(TsvsheetParserCOMMA, i)
+}
+
+func (s *ColSelectorContext) GetRuleContext() antlr.RuleContext {
+	return s
+}
+
+func (s *ColSelectorContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
+	return antlr.TreesStringTree(s, ruleNames, recog)
+}
+
+func (s *ColSelectorContext) EnterRule(listener antlr.ParseTreeListener) {
+	if listenerT, ok := listener.(TsvsheetParserListener); ok {
+		listenerT.EnterColSelector(s)
+	}
+}
+
+func (s *ColSelectorContext) ExitRule(listener antlr.ParseTreeListener) {
+	if listenerT, ok := listener.(TsvsheetParserListener); ok {
+		listenerT.ExitColSelector(s)
+	}
+}
+
+func (s *ColSelectorContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
+	switch t := visitor.(type) {
+	case TsvsheetParserVisitor:
+		return t.VisitColSelector(s)
+
+	default:
+		return t.VisitChildren(s)
+	}
+}
+
+func (p *TsvsheetParser) ColSelector() (localctx IColSelectorContext) {
+	localctx = NewColSelectorContext(p, p.GetParserRuleContext(), p.GetState())
+	p.EnterRule(localctx, 14, TsvsheetParserRULE_colSelector)
+	var _la int
+
+	p.EnterOuterAlt(localctx, 1)
+	{
+		p.SetState(112)
+		p.ColSpan()
+	}
+	p.SetState(117)
+	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
+	_la = p.GetTokenStream().LA(1)
+
+	for _la == TsvsheetParserCOMMA {
+		{
+			p.SetState(113)
+			p.Match(TsvsheetParserCOMMA)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
+		}
+		{
+			p.SetState(114)
+			p.ColSpan()
+		}
+
+		p.SetState(119)
+		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
+		_la = p.GetTokenStream().LA(1)
+	}
+	{
+		p.SetState(120)
+		p.Match(TsvsheetParserEOF)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
+	}
+
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
+	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
+}
+
+// ICountValueContext is an interface to support dynamic dispatch.
+type ICountValueContext interface {
+	antlr.ParserRuleContext
+
+	// GetParser returns the parser.
+	GetParser() antlr.Parser
+
+	// Getter signatures
+	NUMBER() antlr.TerminalNode
+	EOF() antlr.TerminalNode
+
+	// IsCountValueContext differentiates from other interfaces.
+	IsCountValueContext()
+}
+
+type CountValueContext struct {
+	antlr.BaseParserRuleContext
+	parser antlr.Parser
+}
+
+func NewEmptyCountValueContext() *CountValueContext {
+	var p = new(CountValueContext)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = TsvsheetParserRULE_countValue
+	return p
+}
+
+func InitEmptyCountValueContext(p *CountValueContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = TsvsheetParserRULE_countValue
+}
+
+func (*CountValueContext) IsCountValueContext() {}
+
+func NewCountValueContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *CountValueContext {
+	var p = new(CountValueContext)
+
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
+
+	p.parser = parser
+	p.RuleIndex = TsvsheetParserRULE_countValue
+
+	return p
+}
+
+func (s *CountValueContext) GetParser() antlr.Parser { return s.parser }
+
+func (s *CountValueContext) NUMBER() antlr.TerminalNode {
+	return s.GetToken(TsvsheetParserNUMBER, 0)
+}
+
+func (s *CountValueContext) EOF() antlr.TerminalNode {
+	return s.GetToken(TsvsheetParserEOF, 0)
+}
+
+func (s *CountValueContext) GetRuleContext() antlr.RuleContext {
+	return s
+}
+
+func (s *CountValueContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
+	return antlr.TreesStringTree(s, ruleNames, recog)
+}
+
+func (s *CountValueContext) EnterRule(listener antlr.ParseTreeListener) {
+	if listenerT, ok := listener.(TsvsheetParserListener); ok {
+		listenerT.EnterCountValue(s)
+	}
+}
+
+func (s *CountValueContext) ExitRule(listener antlr.ParseTreeListener) {
+	if listenerT, ok := listener.(TsvsheetParserListener); ok {
+		listenerT.ExitCountValue(s)
+	}
+}
+
+func (s *CountValueContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
+	switch t := visitor.(type) {
+	case TsvsheetParserVisitor:
+		return t.VisitCountValue(s)
+
+	default:
+		return t.VisitChildren(s)
+	}
+}
+
+func (p *TsvsheetParser) CountValue() (localctx ICountValueContext) {
+	localctx = NewCountValueContext(p, p.GetParserRuleContext(), p.GetState())
+	p.EnterRule(localctx, 16, TsvsheetParserRULE_countValue)
+	p.EnterOuterAlt(localctx, 1)
+	{
+		p.SetState(122)
+		p.Match(TsvsheetParserNUMBER)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
+	}
+	{
+		p.SetState(123)
+		p.Match(TsvsheetParserEOF)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
+	}
+
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
+	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
+}
+
+// IRowSpanContext is an interface to support dynamic dispatch.
+type IRowSpanContext interface {
+	antlr.ParserRuleContext
+
+	// GetParser returns the parser.
+	GetParser() antlr.Parser
+
+	// Getter signatures
+	AllNUMBER() []antlr.TerminalNode
+	NUMBER(i int) antlr.TerminalNode
+	DASH() antlr.TerminalNode
+
+	// IsRowSpanContext differentiates from other interfaces.
+	IsRowSpanContext()
+}
+
+type RowSpanContext struct {
+	antlr.BaseParserRuleContext
+	parser antlr.Parser
+}
+
+func NewEmptyRowSpanContext() *RowSpanContext {
+	var p = new(RowSpanContext)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = TsvsheetParserRULE_rowSpan
+	return p
+}
+
+func InitEmptyRowSpanContext(p *RowSpanContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = TsvsheetParserRULE_rowSpan
+}
+
+func (*RowSpanContext) IsRowSpanContext() {}
+
+func NewRowSpanContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *RowSpanContext {
+	var p = new(RowSpanContext)
+
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
+
+	p.parser = parser
+	p.RuleIndex = TsvsheetParserRULE_rowSpan
+
+	return p
+}
+
+func (s *RowSpanContext) GetParser() antlr.Parser { return s.parser }
+
+func (s *RowSpanContext) AllNUMBER() []antlr.TerminalNode {
+	return s.GetTokens(TsvsheetParserNUMBER)
+}
+
+func (s *RowSpanContext) NUMBER(i int) antlr.TerminalNode {
+	return s.GetToken(TsvsheetParserNUMBER, i)
+}
+
+func (s *RowSpanContext) DASH() antlr.TerminalNode {
+	return s.GetToken(TsvsheetParserDASH, 0)
+}
+
+func (s *RowSpanContext) GetRuleContext() antlr.RuleContext {
+	return s
+}
+
+func (s *RowSpanContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
+	return antlr.TreesStringTree(s, ruleNames, recog)
+}
+
+func (s *RowSpanContext) EnterRule(listener antlr.ParseTreeListener) {
+	if listenerT, ok := listener.(TsvsheetParserListener); ok {
+		listenerT.EnterRowSpan(s)
+	}
+}
+
+func (s *RowSpanContext) ExitRule(listener antlr.ParseTreeListener) {
+	if listenerT, ok := listener.(TsvsheetParserListener); ok {
+		listenerT.ExitRowSpan(s)
+	}
+}
+
+func (s *RowSpanContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
+	switch t := visitor.(type) {
+	case TsvsheetParserVisitor:
+		return t.VisitRowSpan(s)
+
+	default:
+		return t.VisitChildren(s)
+	}
+}
+
+func (p *TsvsheetParser) RowSpan() (localctx IRowSpanContext) {
+	localctx = NewRowSpanContext(p, p.GetParserRuleContext(), p.GetState())
+	p.EnterRule(localctx, 18, TsvsheetParserRULE_rowSpan)
+	var _la int
+
+	p.EnterOuterAlt(localctx, 1)
+	{
+		p.SetState(125)
+		p.Match(TsvsheetParserNUMBER)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
+	}
+	p.SetState(128)
+	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
+	_la = p.GetTokenStream().LA(1)
+
+	if _la == TsvsheetParserDASH {
+		{
+			p.SetState(126)
+			p.Match(TsvsheetParserDASH)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
+		}
+		{
+			p.SetState(127)
+			p.Match(TsvsheetParserNUMBER)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
+		}
+
+	}
+
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
+	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
+}
+
+// IColSpanContext is an interface to support dynamic dispatch.
+type IColSpanContext interface {
+	antlr.ParserRuleContext
+
+	// GetParser returns the parser.
+	GetParser() antlr.Parser
+
+	// Getter signatures
+	AllCOL() []antlr.TerminalNode
+	COL(i int) antlr.TerminalNode
+	DASH() antlr.TerminalNode
+
+	// IsColSpanContext differentiates from other interfaces.
+	IsColSpanContext()
+}
+
+type ColSpanContext struct {
+	antlr.BaseParserRuleContext
+	parser antlr.Parser
+}
+
+func NewEmptyColSpanContext() *ColSpanContext {
+	var p = new(ColSpanContext)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = TsvsheetParserRULE_colSpan
+	return p
+}
+
+func InitEmptyColSpanContext(p *ColSpanContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = TsvsheetParserRULE_colSpan
+}
+
+func (*ColSpanContext) IsColSpanContext() {}
+
+func NewColSpanContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ColSpanContext {
+	var p = new(ColSpanContext)
+
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
+
+	p.parser = parser
+	p.RuleIndex = TsvsheetParserRULE_colSpan
+
+	return p
+}
+
+func (s *ColSpanContext) GetParser() antlr.Parser { return s.parser }
+
+func (s *ColSpanContext) AllCOL() []antlr.TerminalNode {
+	return s.GetTokens(TsvsheetParserCOL)
+}
+
+func (s *ColSpanContext) COL(i int) antlr.TerminalNode {
+	return s.GetToken(TsvsheetParserCOL, i)
+}
+
+func (s *ColSpanContext) DASH() antlr.TerminalNode {
+	return s.GetToken(TsvsheetParserDASH, 0)
+}
+
+func (s *ColSpanContext) GetRuleContext() antlr.RuleContext {
+	return s
+}
+
+func (s *ColSpanContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
+	return antlr.TreesStringTree(s, ruleNames, recog)
+}
+
+func (s *ColSpanContext) EnterRule(listener antlr.ParseTreeListener) {
+	if listenerT, ok := listener.(TsvsheetParserListener); ok {
+		listenerT.EnterColSpan(s)
+	}
+}
+
+func (s *ColSpanContext) ExitRule(listener antlr.ParseTreeListener) {
+	if listenerT, ok := listener.(TsvsheetParserListener); ok {
+		listenerT.ExitColSpan(s)
+	}
+}
+
+func (s *ColSpanContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
+	switch t := visitor.(type) {
+	case TsvsheetParserVisitor:
+		return t.VisitColSpan(s)
+
+	default:
+		return t.VisitChildren(s)
+	}
+}
+
+func (p *TsvsheetParser) ColSpan() (localctx IColSpanContext) {
+	localctx = NewColSpanContext(p, p.GetParserRuleContext(), p.GetState())
+	p.EnterRule(localctx, 20, TsvsheetParserRULE_colSpan)
+	var _la int
+
+	p.EnterOuterAlt(localctx, 1)
+	{
+		p.SetState(130)
+		p.Match(TsvsheetParserCOL)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
+	}
+	p.SetState(133)
+	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
+	_la = p.GetTokenStream().LA(1)
+
+	if _la == TsvsheetParserDASH {
+		{
+			p.SetState(131)
+			p.Match(TsvsheetParserDASH)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
+		}
+		{
+			p.SetState(132)
+			p.Match(TsvsheetParserCOL)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
+		}
+
 	}
 
 errorExit:

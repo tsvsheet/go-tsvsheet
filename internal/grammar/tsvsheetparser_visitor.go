@@ -66,4 +66,19 @@ type TsvsheetParserVisitor interface {
 
 	// Visit a parse tree produced by TsvsheetParser#cellRef.
 	VisitCellRef(ctx *CellRefContext) interface{}
+
+	// Visit a parse tree produced by TsvsheetParser#rowSelector.
+	VisitRowSelector(ctx *RowSelectorContext) interface{}
+
+	// Visit a parse tree produced by TsvsheetParser#colSelector.
+	VisitColSelector(ctx *ColSelectorContext) interface{}
+
+	// Visit a parse tree produced by TsvsheetParser#countValue.
+	VisitCountValue(ctx *CountValueContext) interface{}
+
+	// Visit a parse tree produced by TsvsheetParser#rowSpan.
+	VisitRowSpan(ctx *RowSpanContext) interface{}
+
+	// Visit a parse tree produced by TsvsheetParser#colSpan.
+	VisitColSpan(ctx *ColSpanContext) interface{}
 }
