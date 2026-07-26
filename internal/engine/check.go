@@ -6,11 +6,14 @@ import (
 	"github.com/tsvsheet/go-tsvsheet/internal/tsvt"
 )
 
-// Diagnostic is an advisory finding about a formula cell: currently an unknown
-// function call (which computes to #NAME?).
+// Diagnostic is an advisory finding about a sheet: an unknown function call in
+// a formula cell (which computes to #NAME?), or a view directive that cannot be
+// read. A cell finding carries Cell; a directive finding carries Line, the
+// 1-based physical line, because a directive occupies a line and no row.
 type Diagnostic struct {
-	Cell    string `json:"cell"`
+	Cell    string `json:"cell,omitempty"`
 	Message string `json:"message"`
+	Line    int    `json:"line,omitempty"`
 	IsFatal bool   `json:"fatal"`
 }
 
