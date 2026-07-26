@@ -61,16 +61,21 @@ func columnLetters(o Offset) string {
 }
 
 // Insertion is a structural edit that adds one row or column before a 1-based
-// position, on one axis.
+// position, on one axis. Size is the axis length before the edit, which a
+// count anchored to the far end needs in order to know whether the insertion
+// fell inside it.
 type Insertion struct {
 	At   Offset
+	Size Offset
 	Axis Axis
 }
 
 // Deletion is a structural edit that removes the row or column at a 1-based
-// position, on one axis.
+// position, on one axis. Size is the axis length before the edit, for the same
+// reason as Insertion.
 type Deletion struct {
 	At   Offset
+	Size Offset
 	Axis Axis
 }
 
@@ -83,9 +88,12 @@ func (v DirectiveValue) Insert(edit Insertion) DirectiveValue {
 	if edit.Axis != v.Axis {
 		return v
 	}
-	return v.mapSpans(func(s Span) (Span, bool) {
-		return Span{First: shiftFor(s.First, edit.At, 1), Last: shiftFor(s.Last, edit.At, 1)}, true
-	})
+	return v.mapItems(
+		func(s Span) (Span, bool) {
+			return Span{First: shiftFor(s.First, edit.At, 1), Last: shiftFor(s.Last, edit.At, 1)}, true
+		},
+		func(n Offset) (Offset, bool) { return growCount(n, edit.At, edit.Size, 1) },
+	)
 }
 
 // Delete returns the value as it stands after a row or column is removed. A
@@ -96,46 +104,73 @@ func (v DirectiveValue) Delete(edit Deletion) DirectiveValue {
 	if edit.Axis != v.Axis {
 		return v
 	}
-	return v.mapSpans(func(s Span) (Span, bool) {
-		// The two endpoints move by different rules: a span starting AT the
-		// removed position now starts at whatever moved up into it, while a
-		// span ending there ends one earlier. When that empties the span it
-		// named only the removed position, so it goes.
-		first, last := deleteFirst(s.First, edit.At), deleteLast(s.Last, edit.At)
-		if first > 0 && last > 0 && last < first {
-			return Span{}, false
-		}
-		return Span{First: first, Last: last}, true
-	})
+	return v.mapItems(
+		func(s Span) (Span, bool) {
+			// The two endpoints move by different rules: a span starting AT the
+			// removed position now starts at whatever moved up into it, while a
+			// span ending there ends one earlier. When that empties the span it
+			// named only the removed position, so it goes.
+			first, last := deleteFirst(s.First, edit.At), deleteLast(s.Last, edit.At)
+			if first > 0 && last > 0 && last < first {
+				return Span{}, false
+			}
+			return Span{First: first, Last: last}, true
+		},
+		func(n Offset) (Offset, bool) { return growCount(n, edit.At, edit.Size, -1) },
+	)
 }
 
-// mapSpans rebuilds a value with each span transformed, dropping the spans the
-// transform rejects and any item left with none. Counts pass through untouched,
-// and item order is preserved throughout.
-func (v DirectiveValue) mapSpans(f func(Span) (Span, bool)) DirectiveValue {
+// mapItems rebuilds a value with every item transformed — spans by one rule,
+// counts by another — dropping whatever no longer describes anything. Item
+// order and grouping are preserved throughout.
+func (v DirectiveValue) mapItems(span func(Span) (Span, bool), count func(Offset) (Offset, bool)) DirectiveValue {
 	items := make([]Item, 0, len(v.Items))
 	for _, item := range v.Items {
-		if moved, keep := item.mapSpans(f); keep {
+		if moved, keep := item.mapItem(span, count); keep {
 			items = append(items, moved)
 		}
 	}
 	return DirectiveValue{Axis: v.Axis, Items: items}
 }
 
-// mapSpans transforms one item's spans, reporting false when nothing survives:
-// a range whose every span named only removed positions has nothing left to
-// say. A count is anchored to an edge, so it always survives untouched.
-func (i Item) mapSpans(f func(Span) (Span, bool)) (Item, bool) {
+// mapItem transforms one item, reporting false when nothing survives: a range
+// whose every span named only removed positions, or a count reduced to nothing.
+func (i Item) mapItem(span func(Span) (Span, bool), count func(Offset) (Offset, bool)) (Item, bool) {
 	if i.Kind == ItemCount {
-		return i, true
+		n, keep := count(i.Count)
+		return Item{Kind: ItemCount, Count: n}, keep
 	}
 	spans := make([]Span, 0, len(i.Spans))
 	for _, s := range i.Spans {
-		if moved, keep := f(s); keep {
+		if moved, keep := span(s); keep {
 			spans = append(spans, moved)
 		}
 	}
 	return Item{Kind: ItemRange, Spans: spans}, len(spans) > 0
+}
+
+// growCount widens or narrows a count when the edit fell INSIDE the block it
+// names — inserting a row within a three-row header makes it a four-row header,
+// and deleting one makes it two. An edit outside the block leaves it alone,
+// since a count re-resolves against its edge either way. A count reduced to
+// nothing describes nothing and is dropped.
+func growCount(n, at, size, by Offset) (Offset, bool) {
+	if !countContains(n, at, size) {
+		return n, true
+	}
+	if n > 0 {
+		return n + by, n+by > 0
+	}
+	return n - by, n-by < 0
+}
+
+// countContains reports whether an edit position falls inside the block a count
+// names: the first n positions, or the last -n of them.
+func countContains(n, at, size Offset) bool {
+	if n > 0 {
+		return at <= n
+	}
+	return at >= size+n+1
 }
 
 // shiftFor moves an absolute endpoint that sits at or after an insertion,

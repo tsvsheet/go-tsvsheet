@@ -66,21 +66,25 @@ func TestInsertShiftsAbsoluteOnly(t *testing.T) {
 		from tsvt.ValueText
 		want tsvt.ValueText
 		at   tsvt.Offset
+		size tsvt.Offset
 	}{
-		{name: "span below the insertion moves", from: "rows(range(5:9))", at: 1, want: "rows(range(6:10))"},
-		{name: "span above it stands still", from: "rows(range(5:9))", at: 20, want: "rows(range(5:9))"},
-		{name: "an insertion inside a span widens it", from: "rows(range(3:7))", at: 5, want: "rows(range(3:8))"},
-		{name: "an insertion at the start pushes it down", from: "rows(range(3:7))", at: 3, want: "rows(range(4:8))"},
-		{name: "a count never moves", from: "rows(count(3))", at: 1, want: "rows(count(3))"},
-		{name: "a from-the-end count never moves", from: "rows(count(-1))", at: 1, want: "rows(count(-1))"},
-		{name: "a from-the-end endpoint never moves", from: "rows(range(5:-1))", at: 1, want: "rows(range(6:-1))"},
-		{name: "one list, both behaviours", from: "rows(count(3), range(5:9))", at: 1, want: "rows(count(3), range(6:10))"},
-		{name: "columns shift on their own axis", from: "cols(range(B:D))", at: 1, want: "cols(range(C:E))"},
+		{name: "span below the insertion moves", from: "rows(range(5:9))", at: 1, size: 20, want: "rows(range(6:10))"},
+		{name: "span above it stands still", from: "rows(range(5:9))", at: 20, size: 30, want: "rows(range(5:9))"},
+		{name: "an insertion inside a span widens it", from: "rows(range(3:7))", at: 5, size: 20, want: "rows(range(3:8))"},
+		{name: "an insertion at the start pushes it down", from: "rows(range(3:7))", at: 3, size: 20, want: "rows(range(4:8))"},
+		{name: "an insertion inside a count widens the block", from: "rows(count(3))", at: 2, size: 20, want: "rows(count(4))"},
+		{name: "an insertion at the counted edge widens it too", from: "rows(count(3))", at: 1, size: 20, want: "rows(count(4))"},
+		{name: "an insertion below the block leaves the count alone", from: "rows(count(3))", at: 4, size: 20, want: "rows(count(3))"},
+		{name: "an insertion inside a from-the-end count widens it", from: "rows(count(-2))", at: 19, size: 20, want: "rows(count(-3))"},
+		{name: "an insertion above a from-the-end count leaves it", from: "rows(count(-2))", at: 3, size: 20, want: "rows(count(-2))"},
+		{name: "a from-the-end endpoint never moves", from: "rows(range(5:-1))", at: 1, size: 20, want: "rows(range(6:-1))"},
+		{name: "one list, both behaviours", from: "rows(count(3), range(5:9))", at: 1, size: 20, want: "rows(count(4), range(6:10))"},
+		{name: "columns shift on their own axis", from: "cols(range(B:D))", at: 1, size: 8, want: "cols(range(C:E))"},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
 			v := mustParse(t, c.from)
-			got := v.Insert(tsvt.Insertion{Axis: v.Axis, At: c.at})
+			got := v.Insert(tsvt.Insertion{Axis: v.Axis, At: c.at, Size: c.size})
 			assert.Equal(t, c.want, got.Render())
 		})
 	}
@@ -93,11 +97,11 @@ func TestInsertIgnoresTheOtherAxis(t *testing.T) {
 
 	cols := mustParse(t, "cols(range(B:D))")
 	assert.Equal(t, tsvt.ValueText("cols(range(B:D))"),
-		cols.Insert(tsvt.Insertion{Axis: tsvt.AxisRow, At: 1}).Render())
+		cols.Insert(tsvt.Insertion{Axis: tsvt.AxisRow, At: 1, Size: 10}).Render())
 
 	rows := mustParse(t, "rows(range(2:4))")
 	assert.Equal(t, tsvt.ValueText("rows(range(2:4))"),
-		rows.Delete(tsvt.Deletion{Axis: tsvt.AxisCol, At: 1}).Render())
+		rows.Delete(tsvt.Deletion{Axis: tsvt.AxisCol, At: 1, Size: 10}).Render())
 }
 
 // TestDeleteShiftsAndDrops covers removal, where the two endpoints move by
@@ -112,19 +116,22 @@ func TestDeleteShiftsAndDrops(t *testing.T) {
 		from tsvt.ValueText
 		want tsvt.ValueText
 		at   tsvt.Offset
+		size tsvt.Offset
 	}{
-		{name: "span below the deletion moves up", from: "rows(range(5:9))", at: 1, want: "rows(range(4:8))"},
-		{name: "span above it stands still", from: "rows(range(5:9))", at: 20, want: "rows(range(5:9))"},
-		{name: "a deletion inside a span narrows it", from: "rows(range(3:7))", at: 5, want: "rows(range(3:6))"},
-		{name: "deleting the last row of a span narrows it", from: "rows(range(3:7))", at: 7, want: "rows(range(3:6))"},
-		{name: "deleting the first row of a span narrows it", from: "rows(range(3:7))", at: 3, want: "rows(range(3:6))"},
-		{name: "a count never moves", from: "rows(count(3))", at: 1, want: "rows(count(3))"},
-		{name: "columns delete on their own axis", from: "cols(range(C:E))", at: 1, want: "cols(range(B:D))"},
+		{name: "span below the deletion moves up", from: "rows(range(5:9))", at: 1, size: 20, want: "rows(range(4:8))"},
+		{name: "span above it stands still", from: "rows(range(5:9))", at: 20, size: 30, want: "rows(range(5:9))"},
+		{name: "a deletion inside a span narrows it", from: "rows(range(3:7))", at: 5, size: 20, want: "rows(range(3:6))"},
+		{name: "deleting the last row of a span narrows it", from: "rows(range(3:7))", at: 7, size: 20, want: "rows(range(3:6))"},
+		{name: "deleting the first row of a span narrows it", from: "rows(range(3:7))", at: 3, size: 20, want: "rows(range(3:6))"},
+		{name: "a deletion inside a count narrows the block", from: "rows(count(3))", at: 2, size: 20, want: "rows(count(2))"},
+		{name: "a deletion below the block leaves the count alone", from: "rows(count(3))", at: 9, size: 20, want: "rows(count(3))"},
+		{name: "a deletion inside a from-the-end count narrows it", from: "rows(count(-3))", at: 19, size: 20, want: "rows(count(-2))"},
+		{name: "columns delete on their own axis", from: "cols(range(C:E))", at: 1, size: 8, want: "cols(range(B:D))"},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
 			v := mustParse(t, c.from)
-			got := v.Delete(tsvt.Deletion{Axis: v.Axis, At: c.at})
+			got := v.Delete(tsvt.Deletion{Axis: v.Axis, At: c.at, Size: c.size})
 			assert.Equal(t, c.want, got.Render())
 		})
 	}
@@ -136,13 +143,26 @@ func TestDeleteShiftsAndDrops(t *testing.T) {
 func TestDeleteDropsAnEmptiedSpan(t *testing.T) {
 	t.Parallel()
 
-	both := mustParse(t, "rows(range(5:5, 8:9))").Delete(tsvt.Deletion{Axis: tsvt.AxisRow, At: 5})
+	both := mustParse(t, "rows(range(5:5, 8:9))").Delete(tsvt.Deletion{Axis: tsvt.AxisRow, At: 5, Size: 20})
 	assert.Equal(t, tsvt.ValueText("rows(range(7:8))"), both.Render(),
 		"the emptied span goes; the one beside it moves up")
 
-	only := mustParse(t, "rows(range(5:5), count(2))").Delete(tsvt.Deletion{Axis: tsvt.AxisRow, At: 5})
+	only := mustParse(t, "rows(range(5:5), count(2))").Delete(tsvt.Deletion{Axis: tsvt.AxisRow, At: 5, Size: 20})
 	assert.Equal(t, tsvt.ValueText("rows(count(2))"), only.Render(),
 		"an item left with no spans goes too, and the count is untouched")
+}
+
+// TestDeleteDropsAnEmptiedCount covers the count equivalent of an emptied
+// span: deleting the only row a count named leaves nothing to declare, so the
+// item goes rather than becoming count(0), which the language refuses.
+func TestDeleteDropsAnEmptiedCount(t *testing.T) {
+	t.Parallel()
+
+	only := mustParse(t, "rows(count(1))").Delete(tsvt.Deletion{Axis: tsvt.AxisRow, At: 1, Size: 20})
+	assert.Empty(t, only.Items, "a header of one row whose row is deleted declares nothing")
+
+	tail := mustParse(t, "rows(count(-1))").Delete(tsvt.Deletion{Axis: tsvt.AxisRow, At: 20, Size: 20})
+	assert.Empty(t, tail.Items, "and the same at the far edge")
 }
 
 // TestEditsPreserveGroupingAndOrder proves the rule a rewrite must not break:
@@ -153,6 +173,6 @@ func TestEditsPreserveGroupingAndOrder(t *testing.T) {
 	t.Parallel()
 
 	v := mustParse(t, "rows(range(2:3, 3:5), count(1))")
-	got := v.Insert(tsvt.Insertion{Axis: tsvt.AxisRow, At: 1})
-	assert.Equal(t, tsvt.ValueText("rows(range(3:4, 4:6), count(1))"), got.Render())
+	got := v.Insert(tsvt.Insertion{Axis: tsvt.AxisRow, At: 1, Size: 20})
+	assert.Equal(t, tsvt.ValueText("rows(range(3:4, 4:6), count(2))"), got.Render())
 }
