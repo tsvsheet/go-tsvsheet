@@ -131,13 +131,16 @@ func newValueParser(src ValueText) (*grammar.TsvsheetParser, *errorSink) {
 // because the two refusals a reader hits most — a bare item and a bare or
 // comma-separated endpoint — are exactly the ones whose fix is not obvious.
 func adviseSyntax(src ValueText, err error) error {
+	// The parser's own position and token names are dropped deliberately: a
+	// directive value is one short field, so quoting it beside the spelling it
+	// should have had says more than "mismatched input '3' expecting NAME".
 	if head, _, found := strings.Cut(string(src), "("); found && !isAxisName(funcName(head)) {
-		return constants.ErrSyntax.With(err, "value", string(src),
+		return constants.ErrSyntax.With(nil, "value", string(src),
 			"hint", "a directive value selects an axis: rows(…) or cols(…)")
 	}
 	for _, advice := range syntaxAdvice {
 		if strings.Contains(string(src), advice.when) {
-			return constants.ErrSyntax.With(err, "value", string(src), "hint", string(advice.say))
+			return constants.ErrSyntax.With(nil, "value", string(src), "hint", string(advice.say))
 		}
 	}
 	return constants.ErrSyntax.With(err, "value", string(src))
