@@ -1,9 +1,9 @@
-# flipbook.tsvt — a flipbook drawn in cells: the figure walks, spins, then jumps.
-# A1 is the whole clock. mod(frame,12)+1 turns one page per recompute pass, and
-# | volatile marks the sheet live at 250ms — so it animates under `tsv serve` and
-# in the playground. Every drawing cell is the same formula: index() picking that
-# row's frame out of the strip beside it, which is why adding pages costs artwork
-# and not formulas. Retype B2:M4 to redraw it; change both 12s to relength it.
+#.flipbook.tsvt — a flipbook drawn in cells: the figure walks, spins, then jumps.
+#.A1 is the whole clock. mod(frame,12)+1 turns one page per recompute pass, and
+#.| volatile marks the sheet live at 250ms — so it animates under `tsv serve` and
+#.in the playground. Every drawing cell is the same formula: index() picking that
+#.row's frame out of the strip beside it, which is why adding pages costs artwork
+#.and not formulas. Retype B2:M4 to redraw it; change both 12s to relength it.
 =mod(frame,12) + 1 | volatile("250ms")	walk	walk	walk	walk	spin	spin	spin	spin	jump	jump	jump	jump
 =index($B2:$M2,1,$A$1)	 o 	 o 	 o 	 o 	 o 	 o 	 o 	 o 	 o 	\o/	\o/	 o 
 =index($B3:$M3,1,$A$1)	/|\	<|>	/|\	<|>	/|\	-|-	\|/	-|-	\|/	 | 	-|-	/|\
