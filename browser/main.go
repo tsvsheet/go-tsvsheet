@@ -14,6 +14,7 @@ package main
 
 import (
 	"encoding/json"
+	"sort"
 	"syscall/js"
 	"time"
 
@@ -42,14 +43,38 @@ func main() {
 // sanctioned serialization — comment and shebang lines preserved), static
 // diagnostics, and the sheet's volatility — both the bare "is anything live"
 // flag and one cadence spec per volatile(…) call, so the page can recompute at
-// the soonest cadence the sheet asks for rather than a flat interval.
+// the soonest cadence the sheet asks for rather than a flat interval — plus the
+// sheet's own view: the rows and columns its `#.` directives hide, head, or
+// freeze, as sorted 1-based positions a page can render without deriving
+// anything itself.
 type view struct {
 	Computed    [][]string            `json:"computed"`
 	Source      [][]string            `json:"source"`
 	Text        string                `json:"text"`
 	Diagnostics []tsvsheet.Diagnostic `json:"diagnostics"`
+	Hidden      axes                  `json:"hidden"`
+	Headers     axes                  `json:"headers"`
+	Frozen      axes                  `json:"frozen"`
 	Volatile    bool                  `json:"volatile"`
 	Schedules   []string              `json:"schedules"`
+}
+
+// axes is one declaration's rows and columns, each a sorted list of 1-based
+// positions. Sorted because a JSON object's key order is not a contract and a
+// page renders in order.
+type axes struct {
+	Rows []int `json:"rows"`
+	Cols []int `json:"cols"`
+}
+
+// positions turns a selection into the sorted list a page can iterate.
+func positions(sel tsvsheet.Selection) []int {
+	out := make([]int, 0, len(sel))
+	for at := range sel {
+		out = append(out, at)
+	}
+	sort.Ints(out)
+	return out
 }
 
 // browserTick is the recompute-pass ordinal, advanced on every render so
@@ -64,11 +89,15 @@ func render(doc tsvsheet.Document) view {
 	browserTick++
 	sheet := doc.Sheet()
 	opts := tsvsheet.ComputeOptions{At: time.Now(), Limits: tsvsheet.BrowserLimits(), Tick: browserTick}
+	declared, viewDiags := doc.View()
 	return view{
 		Computed:    sheet.ComputeWith(opts),
 		Source:      sheet.Source(),
 		Text:        string(doc.Text()),
-		Diagnostics: tsvsheet.Check(sheet),
+		Diagnostics: append(viewDiags, tsvsheet.Check(sheet)...),
+		Hidden:      axes{Rows: positions(declared.HiddenRows), Cols: positions(declared.HiddenCols)},
+		Headers:     axes{Rows: positions(declared.HeaderRows), Cols: positions(declared.HeaderCols)},
+		Frozen:      axes{Rows: positions(declared.FreezeRows), Cols: positions(declared.FreezeCols)},
 		Volatile:    sheet.IsVolatile(),
 		Schedules:   sheet.VolatileSchedules(),
 	}
