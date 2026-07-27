@@ -68,12 +68,12 @@ type Selection map[int]bool
 // View is what a viewport does with the grid: sets of positions, never counts,
 // so a host renders it without re-deriving anything.
 type View struct {
-	HiddenRows Selection
-	HiddenCols Selection
-	HeaderRows Selection
-	HeaderCols Selection
-	FreezeRows Selection
-	FreezeCols Selection
+	HiddenRows Selection `json:"hidden_rows"`
+	HiddenCols Selection `json:"hidden_cols"`
+	HeaderRows Selection `json:"header_rows"`
+	HeaderCols Selection `json:"header_cols"`
+	FreezeRows Selection `json:"freeze_rows"`
+	FreezeCols Selection `json:"freeze_cols"`
 }
 
 // DirectivesOf reads the directives from a document's physical lines. A line
