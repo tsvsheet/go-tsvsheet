@@ -12,8 +12,10 @@ on:
       tag:
         description: Release tag to build tsvsheet.wasm for
         required: true
+# No workflow-level write. `build` runs repo code (make wasm) and gets read-only
+# credentials; only `publish`, which runs no repo code, is granted contents:write.
 permissions:
-  contents: write
+  contents: read
 concurrency:
   group: wasm-${{ github.ref }}
   cancel-in-progress: false
@@ -23,11 +25,21 @@ concurrency:
 env:
   GOPRIVATE: github.com/gomatic/*,github.com/nicerobot/*,github.com/gloo-foo/*,github.com/sqlrest/*,github.com/uplang/*,github.com/tsvsheet/*,github.com/skykernel/*,github.com/xto-email/*
 jobs:
-  wasm:
-    # Only when the release (tag) workflow succeeded, or an explicit backfill.
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+  build:
+    # workflow_run fires in the base repo with the base repo's token, whatever
+    # ref triggered it. Today `release` is push-to-main only, so a fork can never
+    # start this chain — but that invariant lives in another file, and this repo
+    # is public with forking enabled. Assert it here instead of inheriting it:
+    # the triggering run must come from this repository, on the default branch.
+    if: >-
+      ${{ github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      github.event.workflow_run.head_branch == github.event.repository.default_branch) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
     steps:
       # workflow_run.head_sha is a GitHub-generated SHA (safe as a ref); for a
       # dispatch it is empty, so checkout falls back to the default branch and the
@@ -60,12 +72,35 @@ jobs:
           go-version: '1.26'
           check-latest: true
           cache: true
-      # Build the engine WebAssembly and attach it to the release for this tag
-      # (created if missing), so browser consumers pin a versioned tsvsheet.wasm.
+      # Build the engine WebAssembly. This is the step that executes repository
+      # code, and the job it runs in cannot write to the repository.
       - run: make wasm
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wasm
+          path: |
+            dist/tsvsheet.wasm
+            dist/wasm_exec.js
+          if-no-files-found: error
+          retention-days: 1
+
+  # Attach the built engine to the release for this tag (created if missing), so
+  # browser consumers pin a versioned tsvsheet.wasm. This job holds the write
+  # token and deliberately runs no repository code — it only moves artifacts.
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: wasm
+          path: dist
       - uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.tag.outputs.tag }}
+          tag_name: ${{ needs.build.outputs.tag }}
           files: |
             dist/tsvsheet.wasm
             dist/wasm_exec.js
