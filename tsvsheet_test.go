@@ -2,6 +2,7 @@ package tsvsheet_test
 
 import (
 	"bytes"
+	"errors"
 	"strings"
 	"testing"
 
@@ -86,4 +87,112 @@ func TestFacadeLimits(t *testing.T) {
 	want.NotEqual(def, browser)
 	want.Less(browser.ResultCells, def.ResultCells)
 	want.Less(browser.GridDim, def.GridDim)
+}
+
+// tracingFetcher answers one source and refuses every other, reporting the URL
+// it "resolved" to — the shape a real frontend fetcher has, where a relative
+// source is resolved against an operator-supplied base the engine never sees.
+type tracingFetcher struct{}
+
+func (tracingFetcher) Fetch(url tsvsheet.ImportURL, _ tsvsheet.MediaType) (tsvsheet.FetchResult, error) {
+	if url != "balances.tsv" {
+		return tsvsheet.FetchResult{}, errors.New("import reference escapes the data base")
+	}
+	return tsvsheet.FetchResult{
+		ContentType: "text/tab-separated-values",
+		URL:         "https://data.example.com/team/balances.tsv",
+		Body:        []byte("310000\n"),
+	}, nil
+}
+
+func explainCell(t *testing.T, src string) tsvsheet.Trace {
+	t.Helper()
+
+	sheet, err := tsvsheet.Parse([]byte(src))
+	require.NoError(t, err)
+	at, err := tsvsheet.ParseAddress("A1")
+	require.NoError(t, err)
+	trace, err := tsvsheet.ExplainWith(sheet, at, tsvsheet.ComputeOptions{Fetcher: tracingFetcher{}})
+	require.NoError(t, err)
+	return trace
+}
+
+func TestExplainWith_ReportsTheResolvedImportURL(t *testing.T) {
+	t.Parallel()
+
+	trace := explainCell(t, "=importcell(\"balances.tsv\")\n")
+
+	assert.Equal(t, "310000", trace.Value, "the import resolves, where plain Explain would be #IMPORT!")
+	require.Len(t, trace.Imports, 1)
+	assert.Equal(t, "balances.tsv", trace.Imports[0].Source, "the source exactly as the sheet wrote it")
+	assert.Equal(t, "https://data.example.com/team/balances.tsv", trace.Imports[0].URL, "where it actually went")
+	assert.Empty(t, trace.Imports[0].Error)
+}
+
+func TestExplainWith_ReportsWhyAnImportFailed(t *testing.T) {
+	t.Parallel()
+
+	trace := explainCell(t, "=importcell(\"../../admin/keys.tsv\")\n")
+
+	assert.Equal(t, "#IMPORT!", trace.Value, "the grid stays opaque")
+	require.Len(t, trace.Imports, 1)
+	assert.Equal(t, "import reference escapes the data base", trace.Imports[0].Error,
+		"the trace is the only place the specific failure is visible")
+	assert.Empty(t, trace.Imports[0].URL)
+}
+
+func TestExplainWith_ReportsEveryImportInTheFormula(t *testing.T) {
+	t.Parallel()
+
+	trace := explainCell(t, "=iferror(importcell(\"balances.tsv\"), importcell(\"missing.tsv\"))\n")
+
+	require.Len(t, trace.Imports, 2, "both calls are described, not just the one that was evaluated")
+	assert.Equal(t, "balances.tsv", trace.Imports[0].Source)
+	assert.Equal(t, "missing.tsv", trace.Imports[1].Source)
+	assert.NotEmpty(t, trace.Imports[1].Error)
+}
+
+func TestExplainWith_NoImportsInTheFormula(t *testing.T) {
+	t.Parallel()
+
+	trace := explainCell(t, "=1+1\n")
+
+	assert.Equal(t, "2", trace.Value)
+	assert.Empty(t, trace.Imports)
+}
+
+func TestExplainWith_WrongArityIsNotTraced(t *testing.T) {
+	t.Parallel()
+
+	// A malformed IMPORT* is #VALUE! from the evaluator; there is no single
+	// source to report, so the trace carries no import note.
+	trace := explainCell(t, "=importcell(\"a.tsv\", \"b.tsv\")\n")
+
+	assert.Empty(t, trace.Imports)
+}
+
+func TestExplain_WithoutAFetcherTracesNoImports(t *testing.T) {
+	t.Parallel()
+
+	sheet, err := tsvsheet.Parse([]byte("=importcell(\"balances.tsv\")\n"))
+	require.NoError(t, err)
+	at, err := tsvsheet.ParseAddress("A1")
+	require.NoError(t, err)
+
+	trace, err := tsvsheet.Explain(sheet, at)
+	require.NoError(t, err)
+	assert.Equal(t, "#IMPORT!", trace.Value)
+	assert.Empty(t, trace.Imports, "no fetcher means nothing to report")
+}
+
+func TestExplainWith_MissingCell(t *testing.T) {
+	t.Parallel()
+
+	sheet, err := tsvsheet.Parse([]byte("1\n"))
+	require.NoError(t, err)
+	at, err := tsvsheet.ParseAddress("Z99")
+	require.NoError(t, err)
+
+	_, err = tsvsheet.ExplainWith(sheet, at, tsvsheet.ComputeOptions{})
+	require.Error(t, err)
 }

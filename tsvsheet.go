@@ -217,8 +217,23 @@ func DefaultLimits() Limits { return engine.DefaultLimits() }
 func BrowserLimits() Limits { return engine.BrowserLimits() }
 
 // Explain computes the sheet and describes the cell at at: its value, and — when
-// the cell is a formula — that formula and each reference it reads.
+// the cell is a formula — that formula and each reference it reads. Imports and
+// embedded sheets are disabled on this path; use ExplainWith to trace a sheet
+// that uses them.
 func Explain(s Sheet, at Address) (Trace, error) { return engine.Explain(s, at) }
+
+// ExplainWith is Explain with an injected compute environment (Loader, Fetcher,
+// Limits), so a sheet whose cells embed sub-sheets or import external data
+// traces with those resolved. The Trace's Imports report where each IMPORT*
+// actually went and why it failed — the only place that is visible, since every
+// import failure is the same opaque #IMPORT! in the grid.
+func ExplainWith(s Sheet, at Address, opts ComputeOptions) (Trace, error) {
+	return engine.ExplainWith(s, at, opts)
+}
+
+// TraceImport is one IMPORT* call a traced formula performs: the source the
+// sheet wrote, the URL it resolved to, and the reason it failed.
+type TraceImport = engine.TraceImport
 
 // CompileExpr parses and compiles one bare expression — the text that would
 // follow `=` in a formula cell. A malformed expression is ErrSyntax carrying

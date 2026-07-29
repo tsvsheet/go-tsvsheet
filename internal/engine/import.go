@@ -58,8 +58,15 @@ type ImportURL string
 // FetchResult is a Fetcher's response: the raw body and the media type the
 // server declared, which must match the requested Accept for the handshake to
 // succeed (ADR 0006 §2).
+//
+// URL is the location the fetcher actually reached, which is not always the
+// source the sheet named: a relative source is resolved against the operator's
+// data base by the fetcher, so the engine cannot know it. Purely informational —
+// it feeds EXPLAIN so an author can see where a value came from, and nothing in
+// the compute path reads it. A fetcher that leaves it empty is valid.
 type FetchResult struct {
 	ContentType MediaType
+	URL         ImportURL
 	Body        []byte
 }
 
