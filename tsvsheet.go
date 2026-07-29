@@ -39,11 +39,6 @@ type Diagnostic = engine.Diagnostic
 // propagates through expressions per ADR 0003 (rules 3, 8, 12, 14).
 type ErrorValue = engine.ErrorValue
 
-// Expr is one compiled bare expression — the text that would follow `=` in a
-// formula cell — detached from any sheet: compile once with CompileExpr, then
-// evaluate against any number of grids, including concurrently.
-type Expr = engine.Expr
-
 // FetchResult is a Fetcher's response: the raw body and the media type the
 // server declared, which must match the requested Accept for the handshake to
 // succeed (ADR 0006 §2).
@@ -134,13 +129,6 @@ const (
 // malformed formula is a syntax error naming its cell.
 func Parse(src []byte) (Sheet, error) { return engine.Parse(src) }
 
-// View is what a viewport does with a grid, as the sheet's own `#.` directives
-// declare it: which rows and columns are hidden, carry headers, or stay
-// anchored while the rest scrolls. Every field is a set of 1-based positions,
-// resolved against the sheet's extent, so a host renders it without deriving
-// anything itself.
-type View = engine.View
-
 // Selection is a set of 1-based positions on one axis.
 type Selection = engine.Selection
 
@@ -162,17 +150,6 @@ const (
 	KeyHeader = engine.KeyHeader
 	KeyFreeze = engine.KeyFreeze
 )
-
-// Document is a parsed .tsvt file with its physical line layout retained, so
-// comment and shebang lines — which the grid drops — survive editing and are
-// written back in position by Text. Document is immutable: every editing
-// operation returns a new Document. It is the one sanctioned way to serialize
-// a .tsvt; frontends must never rebuild a file from a grid.
-type Document = engine.Document
-
-// ParseDocument reads a .tsvt file like Parse, additionally recording the
-// physical line layout so comment and shebang lines are preserved by Text.
-func ParseDocument(src []byte) (Document, error) { return engine.ParseDocument(src) }
 
 // ParseAddress parses spreadsheet notation (`A1`, `F4`, `AA10`) into an
 // Address. The column is one or more ASCII uppercase letters, the row a
@@ -234,16 +211,6 @@ func ExplainWith(s Sheet, at Address, opts ComputeOptions) (Trace, error) {
 // TraceImport is one IMPORT* call a traced formula performs: the source the
 // sheet wrote, the URL it resolved to, and the reason it failed.
 type TraceImport = engine.TraceImport
-
-// CompileExpr parses and compiles one bare expression — the text that would
-// follow `=` in a formula cell. A malformed expression is ErrSyntax carrying
-// line/column detail via With. The compiled Expr is an immutable value, safe
-// for concurrent reuse; its Eval(g, opts) evaluates against a Grid with the
-// exact semantics of a formula cell in a sheet over that grid — reference
-// resolution, literal coercion, ranges, dynamic arrays, error-value
-// propagation, volatile functions from opts.At, Limits enforcement, and
-// Loader/Fetcher gating — returning error values, never Go errors.
-func CompileExpr(src []byte) (Expr, error) { return engine.CompileExpr(src) }
 
 // FormatValue is the canonical computed-cell text for v — byte-identical to
 // what WriteTSV emits for that value in a computed grid. A 2-D array value

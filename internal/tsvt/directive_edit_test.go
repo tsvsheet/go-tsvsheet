@@ -1,18 +1,16 @@
-package tsvt_test
+package tsvt
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/tsvsheet/go-tsvsheet/internal/tsvt"
 )
 
 // mustParse parses a directive value a test states as source.
-func mustParse(t *testing.T, text tsvt.ValueText) tsvt.DirectiveValue {
+func mustParse(t *testing.T, text ValueText) DirectiveValue {
 	t.Helper()
-	v, err := tsvt.ParseDirectiveValue(text)
+	v, err := ParseDirectiveValue(text)
 	require.NoError(t, err)
 	return v
 }
@@ -24,7 +22,7 @@ func mustParse(t *testing.T, text tsvt.ValueText) tsvt.DirectiveValue {
 func TestRenderRoundTrips(t *testing.T) {
 	t.Parallel()
 
-	for _, text := range []tsvt.ValueText{
+	for _, text := range []ValueText{
 		"rows(range(20:31))",
 		"rows(range(20:31, 40:40))",
 		"rows(count(3))",
@@ -51,7 +49,7 @@ func TestRenderNormalisesSpacingOnly(t *testing.T) {
 	t.Parallel()
 
 	got := mustParse(t, "rows( range( 20 : 31 ) , count( 3 ) )").Render()
-	assert.Equal(t, tsvt.ValueText("rows(range(20:31), count(3))"), got)
+	assert.Equal(t, ValueText("rows(range(20:31), count(3))"), got)
 }
 
 // TestInsertShiftsAbsoluteOnly is the heart of the anchoring-class rule: an
@@ -63,10 +61,10 @@ func TestInsertShiftsAbsoluteOnly(t *testing.T) {
 
 	for _, c := range []struct {
 		name string
-		from tsvt.ValueText
-		want tsvt.ValueText
-		at   tsvt.Offset
-		size tsvt.Offset
+		from ValueText
+		want ValueText
+		at   Offset
+		size Offset
 	}{
 		{name: "span below the insertion moves", from: "rows(range(5:9))", at: 1, size: 20, want: "rows(range(6:10))"},
 		{name: "span above it stands still", from: "rows(range(5:9))", at: 20, size: 30, want: "rows(range(5:9))"},
@@ -84,7 +82,7 @@ func TestInsertShiftsAbsoluteOnly(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
 			v := mustParse(t, c.from)
-			got := v.Insert(tsvt.Insertion{Axis: v.Axis, At: c.at, Size: c.size})
+			got := v.Insert(Insertion{Axis: v.Axis, At: c.at, Size: c.size})
 			assert.Equal(t, c.want, got.Render())
 		})
 	}
@@ -96,12 +94,12 @@ func TestInsertIgnoresTheOtherAxis(t *testing.T) {
 	t.Parallel()
 
 	cols := mustParse(t, "cols(range(B:D))")
-	assert.Equal(t, tsvt.ValueText("cols(range(B:D))"),
-		cols.Insert(tsvt.Insertion{Axis: tsvt.AxisRow, At: 1, Size: 10}).Render())
+	assert.Equal(t, ValueText("cols(range(B:D))"),
+		cols.Insert(Insertion{Axis: AxisRow, At: 1, Size: 10}).Render())
 
 	rows := mustParse(t, "rows(range(2:4))")
-	assert.Equal(t, tsvt.ValueText("rows(range(2:4))"),
-		rows.Delete(tsvt.Deletion{Axis: tsvt.AxisCol, At: 1, Size: 10}).Render())
+	assert.Equal(t, ValueText("rows(range(2:4))"),
+		rows.Delete(Deletion{Axis: AxisCol, At: 1, Size: 10}).Render())
 }
 
 // TestDeleteShiftsAndDrops covers removal, where the two endpoints move by
@@ -113,10 +111,10 @@ func TestDeleteShiftsAndDrops(t *testing.T) {
 
 	for _, c := range []struct {
 		name string
-		from tsvt.ValueText
-		want tsvt.ValueText
-		at   tsvt.Offset
-		size tsvt.Offset
+		from ValueText
+		want ValueText
+		at   Offset
+		size Offset
 	}{
 		{name: "span below the deletion moves up", from: "rows(range(5:9))", at: 1, size: 20, want: "rows(range(4:8))"},
 		{name: "span above it stands still", from: "rows(range(5:9))", at: 20, size: 30, want: "rows(range(5:9))"},
@@ -131,7 +129,7 @@ func TestDeleteShiftsAndDrops(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
 			v := mustParse(t, c.from)
-			got := v.Delete(tsvt.Deletion{Axis: v.Axis, At: c.at, Size: c.size})
+			got := v.Delete(Deletion{Axis: v.Axis, At: c.at, Size: c.size})
 			assert.Equal(t, c.want, got.Render())
 		})
 	}
@@ -143,12 +141,12 @@ func TestDeleteShiftsAndDrops(t *testing.T) {
 func TestDeleteDropsAnEmptiedSpan(t *testing.T) {
 	t.Parallel()
 
-	both := mustParse(t, "rows(range(5:5, 8:9))").Delete(tsvt.Deletion{Axis: tsvt.AxisRow, At: 5, Size: 20})
-	assert.Equal(t, tsvt.ValueText("rows(range(7:8))"), both.Render(),
+	both := mustParse(t, "rows(range(5:5, 8:9))").Delete(Deletion{Axis: AxisRow, At: 5, Size: 20})
+	assert.Equal(t, ValueText("rows(range(7:8))"), both.Render(),
 		"the emptied span goes; the one beside it moves up")
 
-	only := mustParse(t, "rows(range(5:5), count(2))").Delete(tsvt.Deletion{Axis: tsvt.AxisRow, At: 5, Size: 20})
-	assert.Equal(t, tsvt.ValueText("rows(count(2))"), only.Render(),
+	only := mustParse(t, "rows(range(5:5), count(2))").Delete(Deletion{Axis: AxisRow, At: 5, Size: 20})
+	assert.Equal(t, ValueText("rows(count(2))"), only.Render(),
 		"an item left with no spans goes too, and the count is untouched")
 }
 
@@ -158,10 +156,10 @@ func TestDeleteDropsAnEmptiedSpan(t *testing.T) {
 func TestDeleteDropsAnEmptiedCount(t *testing.T) {
 	t.Parallel()
 
-	only := mustParse(t, "rows(count(1))").Delete(tsvt.Deletion{Axis: tsvt.AxisRow, At: 1, Size: 20})
+	only := mustParse(t, "rows(count(1))").Delete(Deletion{Axis: AxisRow, At: 1, Size: 20})
 	assert.Empty(t, only.Items, "a header of one row whose row is deleted declares nothing")
 
-	tail := mustParse(t, "rows(count(-1))").Delete(tsvt.Deletion{Axis: tsvt.AxisRow, At: 20, Size: 20})
+	tail := mustParse(t, "rows(count(-1))").Delete(Deletion{Axis: AxisRow, At: 20, Size: 20})
 	assert.Empty(t, tail.Items, "and the same at the far edge")
 }
 
@@ -173,6 +171,19 @@ func TestEditsPreserveGroupingAndOrder(t *testing.T) {
 	t.Parallel()
 
 	v := mustParse(t, "rows(range(2:3, 3:5), count(1))")
-	got := v.Insert(tsvt.Insertion{Axis: tsvt.AxisRow, At: 1, Size: 20})
-	assert.Equal(t, tsvt.ValueText("rows(range(3:4, 4:6), count(2))"), got.Render())
+	got := v.Insert(Insertion{Axis: AxisRow, At: 1, Size: 20})
+	assert.Equal(t, ValueText("rows(range(3:4, 4:6), count(2))"), got.Render())
+}
+
+// TestAxisNames_SpellEachAxisBackOut pins the claim that a rewritten line reads
+// exactly as an author would have written it: the axis comes back as its own
+// keyword, not a code or an abbreviation.
+func TestAxisNames_SpellEachAxisBackOut(t *testing.T) {
+	t.Parallel()
+
+	for _, src := range []ValueText{"rows(range(2:4))", "cols(range(B:D))"} {
+		v, err := ParseDirectiveValue(src)
+		require.NoError(t, err)
+		assert.Equal(t, string(src), string(v.Render()), "axis name round-trips verbatim")
+	}
 }
