@@ -5,7 +5,9 @@
 // one immutable engine operation, and returns the result as a JSON string. There
 // is no server and no filesystem — SHEET(...) / "file"!A1 resolve to #REF! — but
 // every other function, including the clock functions TODAY/NOW/ISNOW, works
-// against the browser's own clock.
+// against the browser's own clock. A relative IMPORT* resolves against the seed
+// store the page loads with seedData (see seed.go); an absolute URL is refused,
+// so a sheet arriving in a shared link can never cause a network request.
 //
 // go-tsvsheet's release CI builds this into the versioned tsvsheet.wasm asset
 // that browser consumers (the docs playground, tsvsheet.js) pin. It is
@@ -34,6 +36,7 @@ func main() {
 	obj.Set("fill", js.FuncOf(fill))
 	obj.Set("references", js.FuncOf(references))
 	obj.Set("explain", js.FuncOf(explain))
+	obj.Set("seedData", js.FuncOf(seedData))
 	js.Global().Set("tsvsheet", obj)
 	select {} // run until the page unloads
 }
@@ -77,6 +80,18 @@ func positions(sel tsvsheet.Selection) []int {
 	return out
 }
 
+// computeOptions is the environment every browser compute and trace runs
+// under: the tighter browser limits, the page's clock, and the seed-backed
+// Fetcher, so a relative IMPORT* resolves from the store the page loaded.
+func computeOptions() tsvsheet.ComputeOptions {
+	return tsvsheet.ComputeOptions{
+		At:      time.Now(),
+		Limits:  tsvsheet.BrowserLimits(),
+		Tick:    browserTick,
+		Fetcher: seedFetcher{},
+	}
+}
+
 // browserTick is the recompute-pass ordinal, advanced on every render so
 // tick()/frame() animate under the page's periodic recompute. The wasm bridge is
 // single-threaded (the JS event loop), so a package counter is safe.
@@ -88,7 +103,7 @@ var browserTick tsvsheet.Tick
 func render(doc tsvsheet.Document) view {
 	browserTick++
 	sheet := doc.Sheet()
-	opts := tsvsheet.ComputeOptions{At: time.Now(), Limits: tsvsheet.BrowserLimits(), Tick: browserTick}
+	opts := computeOptions()
 	declared, viewDiags := doc.View()
 	return view{
 		Computed:    sheet.ComputeWith(opts),
@@ -188,7 +203,7 @@ func explain(_ js.Value, args []js.Value) any {
 	if err != nil {
 		return result(nil, err)
 	}
-	trace, err := tsvsheet.Explain(doc.Sheet(), addr(args[1], args[2]))
+	trace, err := tsvsheet.ExplainWith(doc.Sheet(), addr(args[1], args[2]), computeOptions())
 	if err != nil {
 		return result(nil, err)
 	}
