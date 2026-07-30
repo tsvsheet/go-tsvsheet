@@ -66,7 +66,8 @@ func (seedFetcher) Fetch(ref tsvsheet.ImportURL, _ tsvsheet.MediaType) (tsvsheet
 	}
 	text, ok := seed[name]
 	if !ok {
-		return tsvsheet.FetchResult{}, errSeedUnknown.With(nil, "name", name, "available", strings.Join(seedNames(), ", "))
+		available := strings.Join(seedNames(), ", ")
+		return tsvsheet.FetchResult{}, errSeedUnknown.With(nil, "name", name, "available", available)
 	}
 	return tsvsheet.FetchResult{
 		ContentType: seedMedia(name),
