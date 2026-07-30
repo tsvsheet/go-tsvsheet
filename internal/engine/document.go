@@ -123,6 +123,19 @@ func (d Document) Fill(from Address, to Span) Document {
 	return Document{sheet: sheet, layout: appendMarkers(d.layout, grown)}
 }
 
+// Paste returns a new document with Sheet.Paste applied — a clipboard block
+// placed at at with its formulas rebased by at−origin; rows the grid grew by
+// are appended to the layout after any trailing comments, as Fill's growth is.
+// Paste is atomic: on error the document is unchanged.
+func (d Document) Paste(at, origin Address, block Grid, limits Limits) (Document, error) {
+	sheet, err := d.sheet.Paste(at, origin, block, limits)
+	if err != nil {
+		return Document{}, err
+	}
+	grown := rowIndex(len(sheet.cells) - len(d.sheet.cells))
+	return Document{sheet: sheet, layout: appendMarkers(d.layout, grown)}, nil
+}
+
 // DuplicateRow returns a new document with row at.Row duplicated below itself
 // (Sheet.DuplicateRow semantics); comments keep the between-row gap they were
 // written in. A no-op on the sheet is a no-op on the document.

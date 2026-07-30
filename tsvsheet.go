@@ -180,6 +180,19 @@ func ReadTSV(r io.Reader) (Grid, error) { return engine.ReadTSV(r) }
 // definition of what a comment is.
 func IsCommentLine(at LineNumber, text SourceLine) bool { return engine.IsCommentLine(at, text) }
 
+// BlockText is clipboard-block source text: TAB-separated cells on
+// newline-separated rows, as a copied range travels through a clipboard.
+type BlockText = engine.BlockText
+
+// ParseBlock reads a clipboard block: CRLF and lone CR normalize to LF, exactly
+// one trailing newline is ignored, rows split on LF and cells on TAB. Every
+// line is data — a clipboard block has no comment or directive semantics,
+// unlike a .tsvt file — so this is the one definition every frontend uses to
+// turn pasted text back into a grid for Document.Paste. An empty text decodes
+// to a single empty cell (its exact TSV serialization), which is how a paste
+// clears one cell.
+func ParseBlock(text BlockText) Grid { return engine.ParseBlock(text) }
+
 // WriteTSV writes the grid as tab-separated rows, each terminated by a newline.
 // A write failure surfaces as constants.ErrWriteFile. Callers wanting buffering
 // pass a bufio.Writer; WriteTSV writes each row directly so a write error is

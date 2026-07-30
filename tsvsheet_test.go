@@ -75,6 +75,25 @@ func TestFacadeRoundTrip(t *testing.T) {
 	want.Equal(string(tsvsheet.ErrName), bad.Compute()[0][0])
 }
 
+// TestFacadeParseBlockPaste drives the clipboard surface through the facade:
+// pasted text decodes with ParseBlock (every line data, CRLF tolerated) and
+// lands through Document.Paste with the copy's references rebased.
+func TestFacadeParseBlockPaste(t *testing.T) {
+	t.Parallel()
+
+	blk := tsvsheet.ParseBlock("=A1*2\r\n")
+	assert.Equal(t, tsvsheet.Grid{{"=A1*2"}}, blk)
+
+	doc, err := tsvsheet.ParseDocument([]byte("10\t=A1*2\n20\n"))
+	require.NoError(t, err)
+	pasted, err := doc.Paste(
+		tsvsheet.Address{Row: 1, Col: 1}, tsvsheet.Address{Row: 0, Col: 1},
+		blk, tsvsheet.DefaultLimits(),
+	)
+	require.NoError(t, err)
+	assert.Equal(t, "10\t=A1*2\n20\t=A2 * 2\n", string(pasted.Text()))
+}
+
 // TestFacadeLimits verifies the two injected ceilings are distinct: the browser
 // build is tighter than the default so untrusted sheets are bounded harder.
 func TestFacadeLimits(t *testing.T) {

@@ -34,6 +34,7 @@ func main() {
 	obj.Set("duplicateRow", js.FuncOf(edit(tsvsheet.Document.DuplicateRow)))
 	obj.Set("duplicateCol", js.FuncOf(edit(tsvsheet.Document.DuplicateCol)))
 	obj.Set("fill", js.FuncOf(fill))
+	obj.Set("paste", js.FuncOf(paste))
 	obj.Set("references", js.FuncOf(references))
 	obj.Set("explain", js.FuncOf(explain))
 	obj.Set("seedData", js.FuncOf(seedData))
@@ -182,6 +183,24 @@ func fill(_ js.Value, args []js.Value) any {
 	}
 	to := tsvsheet.Span{From: addr(args[3], args[4]), To: addr(args[5], args[6])}
 	return result(render(doc.Fill(addr(args[1], args[2]), to)), nil)
+}
+
+// paste places a clipboard block with its top-left at the target, each formula
+// rebased by target−origin with fill semantics — unpinned references shift,
+// `$`-pinned coordinates hold — and re-renders (args: source, atRow, atCol,
+// originRow, originCol, blockText). blockText is decoded by ParseBlock: every
+// line is data, so pasted text can never smuggle in a directive or comment.
+func paste(_ js.Value, args []js.Value) any {
+	doc, err := parse(args)
+	if err != nil {
+		return result(nil, err)
+	}
+	updated, err := doc.Paste(addr(args[1], args[2]), addr(args[3], args[4]),
+		tsvsheet.ParseBlock(tsvsheet.BlockText(args[5].String())), tsvsheet.BrowserLimits())
+	if err != nil {
+		return result(nil, err)
+	}
+	return result(render(updated), nil)
 }
 
 // references returns a cell's precedents and dependents (args: source, row, col).
