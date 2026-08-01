@@ -3,6 +3,7 @@ package engine
 import (
 	"math"
 	"strconv"
+	"strings"
 )
 
 // ErrorValue is a spreadsheet error value — a cell value, not a Go error. It
@@ -56,8 +57,25 @@ func arrayValue(m [][]Value) Value { return Value{kind: kindArray, arr: m} }
 // emptyValue is the empty cell (§ ADR 0003 rule 8).
 func emptyValue() Value { return Value{kind: kindEmpty} }
 
-// numberValue wraps a float result.
-func numberValue(n floatVal) Value { return Value{kind: kindNumber, num: float64(n)} }
+// numberValue wraps a float result, mapping a non-finite one to #NUM! — the
+// error a spreadsheet shows for an overflow or a domain error.
+//
+// The check belongs here rather than at each call site because a numeric cell
+// value must never hold an infinity, and enforcing that by discipline across
+// forty constructors failed: `apply` mapped its results and the aggregates did
+// not, so a sheet whose cells held 1e308 and 1e308 wrote the literal text
+// "+Inf" into the cell summing them. (Exponent notation is a *cell literal*
+// spelling, not a formula one — `=1e308` is a syntax error — so the leak was
+// only ever reachable from stored data, which is exactly the input a document
+// engine has least control over.) That text travels back into documents through
+// Compute and Paste. Making the constructor total means no future builtin can
+// reintroduce the leak.
+func numberValue(n floatVal) Value {
+	if f := float64(n); math.IsNaN(f) || math.IsInf(f, 0) {
+		return errorValue(ErrNum)
+	}
+	return Value{kind: kindNumber, num: float64(n)}
+}
 
 // stringValue wraps a text result.
 func stringValue(s textVal) Value { return Value{kind: kindString, str: string(s)} }
@@ -81,12 +99,21 @@ func errorValue(e ErrorValue) Value { return Value{kind: kindError, str: string(
 // value parses a raw cell string into a Value: empty stays empty, a numeric
 // string becomes a number, a recognized error code round-trips as an error, and
 // anything else is a string.
+//
+// "Numeric" means a decimal number, not everything Go's ParseFloat accepts.
+// That grammar also admits "NaN", "Inf", "0x1p4" and "1_0", none of which any
+// spreadsheet treats as a number — and a TSV exported from one of them
+// routinely carries the literal text NaN in a column of otherwise real values.
+// Reading that as a number made the cell a #NUM! and every aggregate over its
+// column a #NUM! with it, turning one ordinary text cell into a poisoned range.
+// A hex float was worse than that: `0x1p4` displayed as itself and computed as
+// 16, so the cell said one thing and meant another.
 func value(raw textVal) Value {
 	if raw == "" {
 		return emptyValue()
 	}
-	if n, err := strconv.ParseFloat(string(raw), 64); err == nil {
-		return numberValue(floatVal(n))
+	if n, ok := decimalNumber(raw); ok {
+		return numberValue(n)
 	}
 	if isErrorCode(raw) {
 		return Value{kind: kindError, str: string(raw)}
@@ -112,7 +139,7 @@ func (v Value) isError() bool { return v.kind == kindError }
 func (v Value) String() string {
 	switch v.kind {
 	case kindNumber:
-		return strconv.FormatFloat(v.num, 'f', -1, 64)
+		return formatNumber(floatVal(v.num))
 	case kindBool:
 		if v.num != 0 {
 			return "TRUE"
@@ -170,4 +197,14 @@ func (v Value) truthy() (bool, Value) {
 func round(n floatVal, places decimalPlaces) float64 {
 	scale := math.Pow(10, float64(places))
 	return math.Round(float64(n)*scale) / scale
+}
+
+// decimalNumber reads a cell as a decimal number, refusing the spellings Go
+// accepts and spreadsheets do not.
+func decimalNumber(raw textVal) (floatVal, bool) {
+	if strings.TrimLeft(string(raw), "0123456789+-.eE") != "" {
+		return 0, false
+	}
+	n, err := strconv.ParseFloat(string(raw), 64)
+	return floatVal(n), err == nil
 }

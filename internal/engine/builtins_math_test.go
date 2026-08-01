@@ -13,19 +13,37 @@ import (
 // num formats a float as tsvsheet renders it.
 func num(x float64) string { return strconv.FormatFloat(x, 'f', -1, 64) }
 
+// displayed is what a reader sees for a value whose exact float needs more
+// than the fifteen significant digits a computed number is written with
+// (SPECIFICATION §5.2). It is spelled out rather than derived from the
+// engine's own formatter: a test that formats the expectation the same way the
+// code does would agree with any rule, including a wrong one.
+func displayed(x float64) string {
+	switch x {
+	case math.Pi:
+		return "3.14159265358979"
+	case math.Sqrt(math.Pi):
+		return "1.77245385090552"
+	case math.Pi / 4:
+		return "0.785398163397448"
+	default:
+		return num(x)
+	}
+}
+
 func TestMath_HappyPaths(t *testing.T) {
 	t.Parallel()
 
 	// A1=2, C1=3, D1=4 (B1 holds the formula).
 	cases := map[string]string{
-		"pi()":                num(math.Pi),
+		"pi()":                displayed(math.Pi),
 		"sign(-D1)":           "-1",
 		"sign(D1)":            "1",
 		"sign(D1 - D1)":       "0",
 		"int(3.9)":            "3",
 		"trunc(-3.9)":         "-3",
 		"sqrt(144)":           "12",
-		"sqrtpi(1)":           num(math.Sqrt(math.Pi)),
+		"sqrtpi(1)":           displayed(math.Sqrt(math.Pi)),
 		"power(A1, 10)":       "1024",
 		"exp(0)":              "1",
 		"ln(1)":               "0",
@@ -41,12 +59,12 @@ func TestMath_HappyPaths(t *testing.T) {
 		"asin(0)":             "0",
 		"acos(1)":             "0",
 		"atan(0)":             "0",
-		"atan2(1, 1)":         num(math.Atan2(1, 1)),
+		"atan2(1, 1)":         displayed(math.Atan2(1, 1)),
 		"sinh(0)":             "0",
 		"cosh(0)":             "1",
 		"tanh(0)":             "0",
 		"degrees(pi())":       "180",
-		"radians(180)":        num(math.Pi),
+		"radians(180)":        displayed(math.Pi),
 	}
 	for expr, want := range cases {
 		t.Run(expr, func(t *testing.T) {

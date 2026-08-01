@@ -1,19 +1,29 @@
 package engine
 
 import (
-	"math"
 	"strings"
 	"unicode"
 )
 
 // intArg reads a value as a (truncated) character position/count; a non-numeric
 // value yields the value's #VALUE! error.
+//
+// A magnitude no int can hold is refused rather than converted. Go leaves an
+// out-of-range float-to-int conversion implementation-defined, and on a 64-bit
+// target it saturates: 9.3e18 becomes the maximum int, which then wraps
+// negative when a caller adds a length to it and slices with the result. Every
+// caller's range guard passes before that wrap, so the refusal has to happen
+// here, at the conversion, rather than at each use.
 func intArg(v Value) (charPos, Value) {
 	n, nv := v.asNumber()
 	if nv.isError() {
 		return 0, nv
 	}
-	return charPos(math.Trunc(n)), Value{}
+	truncated, ok := boundedInt(floatVal(n))
+	if !ok {
+		return 0, errorValue(ErrValue)
+	}
+	return charPos(truncated), Value{}
 }
 
 // argText is the string form of the i-th argument (arguments are error-free by

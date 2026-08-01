@@ -109,7 +109,7 @@ func renderBinary(e tsvt.Binary) string {
 func binaryOperand(operand tsvt.Expr, parentOp tsvt.BinaryOp, isRight boolResult) string {
 	s := renderExpr(operand)
 	childPrec, parentPrec := exprPrec(operand), binaryPrec(parentOp)
-	tooLoose := childPrec < parentPrec ||
+	tooLoose := isAuthorGrouped(operand) || childPrec < parentPrec ||
 		(childPrec == parentPrec && bool(isRight) != (parentOp == tsvt.OpPow))
 	if tooLoose {
 		return "(" + s + ")"
@@ -121,7 +121,7 @@ func binaryOperand(operand tsvt.Expr, parentOp tsvt.BinaryOp, isRight boolResult
 // when it binds looser than that operator.
 func operandParens(operand tsvt.Expr, parentPrec precedence) string {
 	s := renderExpr(operand)
-	if exprPrec(operand) < parentPrec {
+	if isAuthorGrouped(operand) || exprPrec(operand) < parentPrec {
 		return "(" + s + ")"
 	}
 	return s

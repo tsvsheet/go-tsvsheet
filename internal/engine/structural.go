@@ -220,11 +220,11 @@ func mapRefs(expr tsvt.Expr, f func(tsvt.Reference) tsvt.Expr) tsvt.Expr {
 	case tsvt.RefOperand:
 		return f(e.Ref)
 	case tsvt.Unary:
-		return tsvt.Unary{Op: e.Op, X: mapRefs(e.X, f)}
+		return tsvt.Unary{Op: e.Op, X: mapRefs(e.X, f), IsGrouped: e.IsGrouped}
 	case tsvt.Percent:
 		return tsvt.Percent{X: mapRefs(e.X, f)}
 	case tsvt.Binary:
-		return tsvt.Binary{Op: e.Op, Left: mapRefs(e.Left, f), Right: mapRefs(e.Right, f)}
+		return tsvt.Binary{Op: e.Op, Left: mapRefs(e.Left, f), Right: mapRefs(e.Right, f), IsGrouped: e.IsGrouped}
 	case tsvt.Call:
 		return tsvt.Call{Name: e.Name, Args: mapArgs(e.Args, f), IsPiped: e.IsPiped}
 	default:

@@ -25,7 +25,9 @@ func Check(s Sheet) []Diagnostic {
 	for r, row := range s.cells {
 		for c, cl := range row {
 			if cl.isFormula() {
-				diags = append(diags, unknownFunctions(cl.formula, Address{Row: r, Col: c})...)
+				at := Address{Row: r, Col: c}
+				diags = append(diags, unknownFunctions(cl.formula, at)...)
+				diags = append(diags, divergenceDiagnostics(cl.formula, at)...)
 			}
 		}
 	}

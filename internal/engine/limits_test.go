@@ -77,3 +77,36 @@ func TestSet_HonorsInjectedGridLimit(t *testing.T) {
 	_, err = s.Set(engine.Address{Row: 5, Col: 0}, "x", tiny)
 	assert.ErrorIs(t, err, constants.ErrInvalidValue)
 }
+
+// TestMaxSafeMagnitudeRefusesWhatIntegerArithmeticCannotCarry pins the guard
+// that stands between a stored number and five different panics. A cell holding
+// 9.3e18 is not exotic — a nanosecond timestamp multiplied by anything, or a
+// scientific export, reaches it — and Go's out-of-range float-to-int conversion
+// saturates rather than failing, so every range check downstream passed on a
+// value that had already become nonsense.
+func TestMaxSafeMagnitudeRefusesWhatIntegerArithmeticCannotCarry(t *testing.T) {
+	t.Parallel()
+	for _, formula := range []string{
+		`=mid("abc",A1,A1)`, `=sequence(A1,A1)`, `=randarray(A1,A1)`,
+		`=rept("ab",A1)`, `=randbetween(-A1,A1)`, `=left("abc",A1)`, `=right("abc",A1)`,
+	} {
+		sheet, err := engine.Parse([]byte("9.3e18\n" + formula + "\n"))
+		require.NoError(t, err)
+
+		assert.NotPanics(t, func() {
+			assert.Contains(t, []string{"#VALUE!", "#NUM!"}, sheet.Compute()[1][0], formula)
+		}, formula)
+	}
+}
+
+// TestTooManyCellsCountsADimensionThatAloneExceedsTheBudget pins the overflow
+// its own doc comment used to deny. Two dimensions of maxInt multiply to 1 in
+// int64, which is under every budget, so a request for 9.2 quintillion cells
+// was authorised and the allocation panicked.
+func TestTooManyCellsCountsADimensionThatAloneExceedsTheBudget(t *testing.T) {
+	t.Parallel()
+	sheet, err := engine.Parse([]byte("9.3e18\n=sequence(A1,A1)\n"))
+	require.NoError(t, err)
+
+	assert.NotEqual(t, "", sheet.Compute()[1][0], "a refusal, not an allocation")
+}

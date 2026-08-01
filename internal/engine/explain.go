@@ -11,12 +11,15 @@ import (
 // Trace explains how one cell was produced: its value, the formula (empty for a
 // literal), the resolved value of each cell the formula reads, and — when the
 // formula imports — where each import went and whether it succeeded.
+// Notes carries the same Excel divergences Check reports, so a reader who has
+// not run the checker still learns why a cell reads the way it does.
 type Trace struct {
 	Cell    string        `json:"cell"`
 	Value   string        `json:"value"`
 	Formula string        `json:"formula,omitempty"`
 	Inputs  []TraceInput  `json:"inputs,omitempty"`
 	Imports []TraceImport `json:"imports,omitempty"`
+	Notes   []string      `json:"notes,omitempty"`
 }
 
 // TraceInput is one reference a formula reads, with its resolved value.
@@ -64,8 +67,24 @@ func explainWith(s Sheet, at Address, newComp func() computer) (Trace, error) {
 		trace.Formula = renderExpr(cl.formula)
 		trace.Inputs = traceInputs(comp, cl.formula)
 		trace.Imports = traceImports(comp, cl.formula)
+		trace.Notes = divergenceNotes(cl.formula)
 	}
 	return trace, nil
+}
+
+// divergenceNotes lists the Excel divergences in one formula, in the order they
+// appear. It reuses the checker so the two can never drift into telling an
+// author different things about the same cell.
+func divergenceNotes(expr tsvt.Expr) []string {
+	diags := divergenceDiagnostics(expr, Address{})
+	if len(diags) == 0 {
+		return nil
+	}
+	notes := make([]string, len(diags))
+	for i, diag := range diags {
+		notes[i] = diag.Message
+	}
+	return notes
 }
 
 // traceImports describes every IMPORT* call in the formula. It re-asks the

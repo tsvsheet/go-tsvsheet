@@ -47,19 +47,31 @@ const (
 	OpPos UnaryOp = "+"
 )
 
-// Binary is a binary operation.
+// Binary is a binary operation. IsGrouped records that the author wrapped this
+// operation in parentheses — redundant ones included. Grouping is authored
+// information, not noise: it is how a reader was told which reading was meant,
+// so it survives parsing and rewriting, and it tells the Excel-divergence
+// checker that this precedence was chosen rather than tripped over.
+//
+// A renderer re-emits the parentheses wherever the expression appears as an
+// operand. Parentheses around a formula's whole expression are not re-emitted:
+// with no surrounding operator they cannot change a reading, and there is no
+// operand context in which to place them.
 type Binary struct {
 	exprMarker
-	Left  Expr
-	Right Expr
-	Op    BinaryOp
+	Left      Expr
+	Right     Expr
+	Op        BinaryOp
+	IsGrouped bool
 }
 
-// Unary is a unary sign operation.
+// Unary is a unary sign operation. IsGrouped carries the same authored
+// parenthesization Binary does.
 type Unary struct {
 	exprMarker
-	X  Expr
-	Op UnaryOp
+	X         Expr
+	Op        UnaryOp
+	IsGrouped bool
 }
 
 // Percent is a postfix-percent operation: `50%` is `Percent{50}` = 0.5.

@@ -158,3 +158,37 @@ func TestParse_ReadError(t *testing.T) {
 	require.Error(t, err)
 	assert.ErrorIs(t, err, constants.ErrReadInput)
 }
+
+// TestDecimalNumberReadsOnlyTheSpellingsASpreadsheetCallsANumber pins which
+// cell contents are data and which are numbers. Go's ParseFloat also accepts
+// "NaN", "Inf", "0x1p4" and "1_0"; a TSV exported from pandas or R routinely
+// carries the literal text NaN in a column of otherwise real values, and
+// reading it as a number turned one ordinary text cell into a #NUM! that
+// poisoned every aggregate over its column. The hex float was worse: the cell
+// displayed "0x1p4" and computed as 16.
+func TestDecimalNumberReadsOnlyTheSpellingsASpreadsheetCallsANumber(t *testing.T) {
+	t.Parallel()
+	sheet, err := engine.Parse(
+		[]byte(
+			"NaN\tInf\t0x1p4\t1_0\t1e308\t-2.5\n=istext(A1)\t=istext(B1)\t=istext(C1)\t=istext(D1)\t=isnumber(E1)\t=isnumber(F1)\n",
+		),
+	)
+	require.NoError(t, err)
+	computed := sheet.Compute()
+
+	assert.Equal(t, []string{"TRUE", "TRUE", "TRUE", "TRUE", "TRUE", "TRUE"}, computed[1],
+		"the four Go-only spellings are text; exponent and signed decimal notation are numbers")
+	assert.Equal(t, "0x1p4", computed[0][2], "and a cell shows what it holds")
+}
+
+// TestTextInAColumnDoesNotBecomeANumericError pins the consequence: text stays
+// text, so a stray NaN behaves exactly like any other word in the column.
+func TestTextInAColumnDoesNotBecomeANumericError(t *testing.T) {
+	t.Parallel()
+	sheet, err := engine.Parse([]byte("1\nNaN\n3\n=count(A1:A3)\t=len(A2)\n"))
+	require.NoError(t, err)
+	computed := sheet.Compute()[3]
+
+	assert.Equal(t, "2", computed[0], "two of the three cells are numbers")
+	assert.Equal(t, "3", computed[1], "and the third is a three-character word")
+}

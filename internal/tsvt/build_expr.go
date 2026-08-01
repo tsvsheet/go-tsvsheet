@@ -10,7 +10,7 @@ import (
 func buildExpr(ctx grammar.IExpressionContext) (Expr, error) {
 	switch c := ctx.(type) {
 	case *grammar.ParenExprContext:
-		return buildExpr(c.Expression())
+		return grouped(buildExpr(c.Expression()))
 	case *grammar.PercentExprContext:
 		return buildPercent(c)
 	case *grammar.PowExprContext:
@@ -150,4 +150,21 @@ func buildArgs(ctx grammar.IArgListContext) ([]Expr, error) {
 		args[i] = arg
 	}
 	return args, nil
+}
+
+// grouped marks a parsed expression as parenthesized by its author. Only the
+// operator nodes carry the mark: parentheses around a literal, a reference, or
+// a call change neither the reading nor how it renders, so recording them would
+// be noise with no reader.
+func grouped(expr Expr, err error) (Expr, error) {
+	switch node := expr.(type) {
+	case Binary:
+		node.IsGrouped = true
+		return node, err
+	case Unary:
+		node.IsGrouped = true
+		return node, err
+	default:
+		return expr, err
+	}
 }

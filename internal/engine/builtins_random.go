@@ -117,7 +117,8 @@ func (r resolver) randFloat(args []tsvt.Expr) Value {
 }
 
 // randBetween evaluates randbetween(lo, hi): a uniform integer in [lo, hi].
-// Bounds truncate toward zero; hi < lo is #NUM!; a non-numeric bound is #VALUE!.
+// Bounds truncate toward zero; hi < lo is #NUM!; a non-numeric bound is
+// #VALUE!; a bound too large for integer arithmetic to carry is #NUM!.
 func (r resolver) randBetween(args []tsvt.Expr) Value {
 	if len(args) != 2 {
 		return errorValue(ErrValue)
@@ -130,7 +131,13 @@ func (r resolver) randBetween(args []tsvt.Expr) Value {
 	if bad.isError() {
 		return bad
 	}
-	loI, hiI := int64(lo), int64(hi)
+	loI, loOK := boundedInt(floatVal(lo))
+	hiI, hiOK := boundedInt(floatVal(hi))
+	if !loOK || !hiOK {
+		// Unbounded ends make hi-lo+1 wrap, and a wrapped span of 0 divides by
+		// zero inside the generator.
+		return errorValue(ErrNum)
+	}
 	if hiI < loI {
 		return errorValue(ErrNum)
 	}
