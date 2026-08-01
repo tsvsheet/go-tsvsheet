@@ -136,6 +136,19 @@ func (d Document) Paste(at, origin Address, block Grid, limits Limits) (Document
 	return Document{sheet: sheet, layout: appendMarkers(d.layout, grown)}, nil
 }
 
+// PasteInto returns a new document with Sheet.PasteInto applied — the block
+// tiling an exactly-divisible span (each tile rebased to its own position) or
+// placed once at the span's top-left; growth appends layout markers as
+// Paste's growth does. Atomic: on error the document is unchanged.
+func (d Document) PasteInto(target Span, origin Address, block Grid, limits Limits) (Document, error) {
+	sheet, err := d.sheet.PasteInto(target, origin, block, limits)
+	if err != nil {
+		return Document{}, err
+	}
+	grown := rowIndex(len(sheet.cells) - len(d.sheet.cells))
+	return Document{sheet: sheet, layout: appendMarkers(d.layout, grown)}, nil
+}
+
 // DuplicateRow returns a new document with row at.Row duplicated below itself
 // (Sheet.DuplicateRow semantics); comments keep the between-row gap they were
 // written in. A no-op on the sheet is a no-op on the document.

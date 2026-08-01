@@ -35,6 +35,7 @@ func main() {
 	obj.Set("duplicateCol", js.FuncOf(edit(tsvsheet.Document.DuplicateCol)))
 	obj.Set("fill", js.FuncOf(fill))
 	obj.Set("paste", js.FuncOf(paste))
+	obj.Set("pasteInto", js.FuncOf(pasteInto))
 	obj.Set("references", js.FuncOf(references))
 	obj.Set("explain", js.FuncOf(explain))
 	obj.Set("seedData", js.FuncOf(seedData))
@@ -197,6 +198,25 @@ func paste(_ js.Value, args []js.Value) any {
 	}
 	updated, err := doc.Paste(addr(args[1], args[2]), addr(args[3], args[4]),
 		tsvsheet.ParseBlock(tsvsheet.BlockText(args[5].String())), tsvsheet.BrowserLimits())
+	if err != nil {
+		return result(nil, err)
+	}
+	return result(render(updated), nil)
+}
+
+// pasteInto places a clipboard block over the target span: an exactly
+// block-divisible span TILES (each tile rebased to its own position — one
+// copied row spread-pastes onto every selected row), any other span pastes
+// once at its top-left (args: source, loRow, loCol, hiRow, hiCol, originRow,
+// originCol, blockText).
+func pasteInto(_ js.Value, args []js.Value) any {
+	doc, err := parse(args)
+	if err != nil {
+		return result(nil, err)
+	}
+	target := tsvsheet.Span{From: addr(args[1], args[2]), To: addr(args[3], args[4])}
+	updated, err := doc.PasteInto(target, addr(args[5], args[6]),
+		tsvsheet.ParseBlock(tsvsheet.BlockText(args[7].String())), tsvsheet.BrowserLimits())
 	if err != nil {
 		return result(nil, err)
 	}
