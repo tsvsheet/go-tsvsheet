@@ -16,6 +16,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"sort"
 	"syscall/js"
 	"time"
@@ -25,22 +26,41 @@ import (
 
 func main() {
 	obj := js.Global().Get("Object").New()
-	obj.Set("compute", js.FuncOf(compute))
-	obj.Set("setCell", js.FuncOf(setCell))
-	obj.Set("insertRow", js.FuncOf(edit(tsvsheet.Document.InsertRow)))
-	obj.Set("deleteRow", js.FuncOf(edit(tsvsheet.Document.DeleteRow)))
-	obj.Set("insertCol", js.FuncOf(edit(tsvsheet.Document.InsertCol)))
-	obj.Set("deleteCol", js.FuncOf(edit(tsvsheet.Document.DeleteCol)))
-	obj.Set("duplicateRow", js.FuncOf(edit(tsvsheet.Document.DuplicateRow)))
-	obj.Set("duplicateCol", js.FuncOf(edit(tsvsheet.Document.DuplicateCol)))
-	obj.Set("fill", js.FuncOf(fill))
-	obj.Set("paste", js.FuncOf(paste))
-	obj.Set("pasteInto", js.FuncOf(pasteInto))
-	obj.Set("references", js.FuncOf(references))
-	obj.Set("explain", js.FuncOf(explain))
-	obj.Set("seedData", js.FuncOf(seedData))
+	obj.Set("compute", guarded(compute))
+	obj.Set("setCell", guarded(setCell))
+	obj.Set("insertRow", guarded(edit(tsvsheet.Document.InsertRow)))
+	obj.Set("deleteRow", guarded(edit(tsvsheet.Document.DeleteRow)))
+	obj.Set("insertCol", guarded(edit(tsvsheet.Document.InsertCol)))
+	obj.Set("deleteCol", guarded(edit(tsvsheet.Document.DeleteCol)))
+	obj.Set("duplicateRow", guarded(edit(tsvsheet.Document.DuplicateRow)))
+	obj.Set("duplicateCol", guarded(edit(tsvsheet.Document.DuplicateCol)))
+	obj.Set("fill", guarded(fill))
+	obj.Set("paste", guarded(paste))
+	obj.Set("pasteInto", guarded(pasteInto))
+	obj.Set("references", guarded(references))
+	obj.Set("explain", guarded(explain))
+	obj.Set("seedData", guarded(seedData))
 	js.Global().Set("tsvsheet", obj)
 	select {} // run until the page unloads
+}
+
+// guarded wraps a binding so a panic (a short-arity call's index error, an
+// unexpected runtime fault) becomes an {"error": …} result instead of killing
+// the Go runtime — a dead wasm engine takes the page's whole session with it.
+// (A fatal runtime abort like out-of-memory is still unrecoverable; the
+// engine bounds its allocations so no single call can reach one.)
+func guarded(fn func(js.Value, []js.Value) any) js.Func {
+	return js.FuncOf(func(this js.Value, args []js.Value) (out any) {
+		defer func() {
+			if r := recover(); r != nil {
+				b, _ := json.Marshal(map[string]string{
+					"error": fmt.Sprintf("engine call failed: %v", r),
+				})
+				out = string(b)
+			}
+		}()
+		return fn(this, args)
+	})
 }
 
 // view is the render model returned to JS after any operation: the computed

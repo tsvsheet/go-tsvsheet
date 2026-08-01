@@ -319,6 +319,62 @@ func TestPasteInto_SpanEqualToBlockIsExactlyPaste(t *testing.T) {
 	assert.Equal(t, viaPaste.Source(), viaInto.Source())
 }
 
+func TestPasteInto_MultiRowBlockTilesByItsOwnHeight(t *testing.T) {
+	t.Parallel()
+
+	// A 2-row block over a 4-row span lands twice, whole — the row stride is
+	// the BLOCK height, never one (a stride mutation repeats the first row
+	// and grows past the span).
+	s := parse(t, "x\nx\nx\nx\n")
+	got := pasteInto(t, s, span(0, 0, 3, 0), addr(0, 0), block([]string{"a"}, []string{"b"}))
+
+	require.Len(t, got.Source(), 4)
+	assert.Equal(t, "a", sourceAt(t, got, 0, 0))
+	assert.Equal(t, "b", sourceAt(t, got, 1, 0))
+	assert.Equal(t, "a", sourceAt(t, got, 2, 0))
+	assert.Equal(t, "b", sourceAt(t, got, 3, 0))
+}
+
+func TestPasteInto_TheReceiverSheetIsUntouched(t *testing.T) {
+	t.Parallel()
+
+	// Sheet is a value: a SUCCESSFUL tiled paste must never write through
+	// into the receiver's rows (dropping the clone shares the backing array).
+	s := parse(t, "keep\nkeep\n")
+	got := pasteInto(t, s, span(0, 0, 1, 0), addr(0, 0), block([]string{"new"}))
+
+	assert.Equal(t, "new", sourceAt(t, got, 0, 0))
+	assert.Equal(t, "keep", sourceAt(t, s, 0, 0))
+	assert.Equal(t, "keep", sourceAt(t, s, 1, 0))
+}
+
+func TestPasteInto_SpanAreaIsBoundedByResultCells(t *testing.T) {
+	t.Parallel()
+
+	// Four caller integers must not buy O(area) work: a span past the
+	// result-cells ceiling is refused up front — an OOM inside wasm aborts
+	// the runtime fatally and kills the engine for the page's life.
+	s := parse(t, "1\n")
+	limits := engine.Limits{ResultCells: 100, GridDim: 1000, ResultBytes: 100}
+	_, err := s.PasteInto(span(0, 0, 10, 10), addr(0, 0), block([]string{"x"}), limits)
+	assert.ErrorIs(t, err, constants.ErrInvalidValue)
+	// At the ceiling exactly (10×10 = 100), the paste proceeds.
+	_, ok := s.PasteInto(span(0, 0, 9, 9), addr(0, 0), block([]string{"x"}), limits)
+	assert.NoError(t, ok)
+}
+
+func TestPasteInto_CommentMarkerRefusedInsideATile(t *testing.T) {
+	t.Parallel()
+
+	// The comment-marker guard fires for a first-column tile cell, naming it,
+	// and the whole tiled paste is refused.
+	s := parse(t, "x\nx\n")
+	_, err := s.PasteInto(span(0, 0, 1, 0), addr(0, 0), block([]string{"#. note"}), engine.DefaultLimits())
+	require.Error(t, err)
+	assert.Equal(t, "x", sourceAt(t, s, 0, 0))
+	assert.Equal(t, "x", sourceAt(t, s, 1, 0))
+}
+
 func TestPasteInto_AtomicAcrossTiles(t *testing.T) {
 	t.Parallel()
 

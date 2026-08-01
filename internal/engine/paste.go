@@ -75,6 +75,11 @@ func (s Sheet) PasteInto(target Span, origin Address, block Grid, limits Limits)
 
 // pasteTiles fills an exactly-divisible span tile by tile over ONE copy of
 // the grid — a thousand-cell selection is one allocation, not a thousand.
+// Atomicity note: every per-cell refusal (a syntax error, the comment-marker
+// guard) depends only on the block's text and the target's column class, and
+// the leftmost/topmost tile is always visited first — so with today's
+// refusal set a failure can only fire in the FIRST tile that can fail at
+// all; the sheet copy still makes the later-tile guarantee structural.
 func (s Sheet) pasteTiles(span Span, origin Address, block Grid, limits Limits) (Sheet, error) {
 	if err := spanBounds(span, origin, limits); err != nil {
 		return Sheet{}, err
@@ -116,8 +121,11 @@ func pasteBlockInto(cells [][]cell, at, origin Address, block Grid, width colInd
 	return cells, nil
 }
 
-// spanBounds rejects a tiled paste whose span has negative corners or reaches
-// the grid limit, mirroring pasteBounds for the single placement.
+// spanBounds rejects a tiled paste whose span has negative corners, reaches
+// the grid limit on either axis, or whose AREA exceeds the result-cells
+// ceiling — the work and the allocation are O(area) while the request is four
+// integers, so an unbounded area is an out-of-memory the caller cannot catch
+// (the wasm runtime aborts fatally, killing the engine for the page's life).
 func spanBounds(span Span, origin Address, limits Limits) error {
 	if span.From.Row < 0 || span.From.Col < 0 {
 		return constants.ErrInvalidValue.With(nil, "address", span.From.String())
@@ -127,6 +135,11 @@ func spanBounds(span Span, origin Address, limits Limits) error {
 	}
 	if span.To.Row >= limits.GridDim || span.To.Col >= limits.GridDim {
 		return constants.ErrInvalidValue.With(nil, "paste exceeds the grid limit", span.To.String())
+	}
+	rows := span.To.Row - span.From.Row + 1
+	cols := span.To.Col - span.From.Col + 1
+	if rows*cols > limits.ResultCells {
+		return constants.ErrInvalidValue.With(nil, "paste span exceeds the cell limit", span.To.String())
 	}
 	return nil
 }
