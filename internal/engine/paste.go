@@ -77,6 +77,9 @@ func padded(row []string, width colIndex) []string {
 func pasteRow(cells [][]cell, from Address, row []string, d offset) ([][]cell, error) {
 	for c, text := range row {
 		target := Address{Row: from.Row, Col: from.Col + c}
+		if WouldStartCommentLine(target, CellText(text)) {
+			return nil, constants.ErrCommentCell.With(nil, "cell", target.String())
+		}
 		parsed, err := parseCell(textVal(text), rowIndex(target.Row), colIndex(target.Col))
 		if err != nil {
 			return nil, err

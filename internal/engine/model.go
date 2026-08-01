@@ -218,6 +218,9 @@ func (s Sheet) Set(addr Address, text string, limits Limits) (Sheet, error) {
 	if addr.Row >= limits.GridDim || addr.Col >= limits.GridDim {
 		return Sheet{}, constants.ErrInvalidValue.With(nil, "address exceeds the grid limit", addr.String())
 	}
+	if WouldStartCommentLine(addr, CellText(text)) {
+		return Sheet{}, constants.ErrCommentCell.With(nil, "cell", addr.String())
+	}
 	parsed, err := parseCell(textVal(text), rowIndex(addr.Row), colIndex(addr.Col))
 	if err != nil {
 		return Sheet{}, err

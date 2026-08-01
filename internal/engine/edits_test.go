@@ -226,6 +226,120 @@ func TestApplyEmptyEditsIsIdentity(t *testing.T) {
 	assert.Equal(t, engine.Revision(doc), engine.Revision(out))
 }
 
+// TestApplyCRLFBatchStoresNoCarriageReturn pins the fixed point: a CRLF batch
+// must store exactly what an LF batch stores, so the document re-reads
+// identically and its revision names the bytes on disk.
+func TestApplyCRLFBatchStoresNoCarriageReturn(t *testing.T) {
+	got := applied(t, "1\t2\n", "#.base\t\r\nsetCell\tB1\t9\r\n")
+	assert.Equal(t, "1\t9\n", got)
+	reparsed, err := engine.ParseDocument([]byte(got))
+	require.NoError(t, err)
+	assert.Equal(t, got, string(reparsed.Text()), "the written document is a fixed point")
+}
+
+func TestApplyCRLFRevisionNamesTheStoredBytes(t *testing.T) {
+	doc := parseDoc(t, "1\t2\n")
+	out, err := engine.Apply(doc, parseEdits(t, "setCell\tB1\t9\r\n"), engine.DefaultLimits())
+	require.NoError(t, err)
+	reparsed, err := engine.ParseDocument(out.Text())
+	require.NoError(t, err)
+	assert.Equal(t, engine.Revision(out), engine.Revision(reparsed))
+}
+
+func TestApplyCRLFBaseIsComparable(t *testing.T) {
+	doc := parseDoc(t, "1\n")
+	edits := parseEdits(t, "#.base\t"+string(engine.Revision(doc))+"\r\nsetCell\tA1\t2\r\n")
+	_, err := engine.Apply(doc, edits, engine.DefaultLimits())
+	require.NoError(t, err, "a CRLF base line must match the revision it names")
+}
+
+// TestApplyRefusesCommentMarkerCells pins the injection refusal: a first-column
+// cell that would make its row a comment line deletes that row on the next
+// read, shifting every address below it — so the edit is refused, not written.
+func TestApplyRefusesCommentMarkerCells(t *testing.T) {
+	for name, text := range map[string]string{
+		"directive": "#.note",
+		"legacy":    "# note",
+		"shebang":   "#!/usr/bin/env tsvsheet",
+	} {
+		t.Run(name, func(t *testing.T) {
+			doc := parseDoc(t, "alpha\t10\nbeta\t20\n")
+			_, err := engine.Apply(doc, parseEdits(t, "setCell\tA1\t"+text+"\n"), engine.DefaultLimits())
+			require.Error(t, err)
+			assert.ErrorIs(t, err, constants.ErrCommentCell)
+			assert.Equal(t, "alpha\t10\nbeta\t20\n", string(doc.Text()))
+		})
+	}
+}
+
+func TestApplyAllowsCommentMarkerTextAwayFromTheFirstColumn(t *testing.T) {
+	// Only the first cell can start a line, so the marker is ordinary text
+	// anywhere else — and `#<TAB>` and `#N/A` are data even in column A.
+	assert.Equal(t, "1\t#.note\n", applied(t, "1\t2\n", "setCell\tB1\t#.note\n"))
+	assert.Equal(t, "#N/A\t2\n", applied(t, "1\t2\n", "setCell\tA1\t#N/A\n"))
+}
+
+func TestApplyRefusesCommentMarkerInPastedBlock(t *testing.T) {
+	block := base64.StdEncoding.EncodeToString([]byte("#.note\tx"))
+	doc := parseDoc(t, "alpha\t10\n")
+	_, err := engine.Apply(doc, parseEdits(t, "paste\tA1\tA1\t"+block+"\n"), engine.DefaultLimits())
+	require.Error(t, err)
+	assert.ErrorIs(t, err, constants.ErrCommentCell)
+	assert.Equal(t, "alpha\t10\n", string(doc.Text()))
+}
+
+// TestApplyFillHonoursTheGridLimit pins that fill is bounded: Document.Fill
+// takes no limits, so without the edits-layer check one short line could grow
+// the grid without ceiling.
+func TestApplyFillHonoursTheGridLimit(t *testing.T) {
+	limits := engine.Limits{ResultCells: 100, GridDim: 10, ResultBytes: 100}
+	for name, edit := range map[string]string{
+		"rows": "fill\tA1\tA1:A99\n",
+		"cols": "fill\tA1\tA1:CZ1\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			doc := parseDoc(t, "1\n")
+			_, err := engine.Apply(doc, parseEdits(t, edit), limits)
+			require.Error(t, err)
+			assert.ErrorIs(t, err, constants.ErrEditsApply)
+			assert.ErrorIs(t, err, constants.ErrInvalidValue)
+		})
+	}
+}
+
+func TestApplyFillWithinTheGridLimitProceeds(t *testing.T) {
+	limits := engine.Limits{ResultCells: 100, GridDim: 10, ResultBytes: 100}
+	out, err := engine.Apply(parseDoc(t, "7\n"), parseEdits(t, "fill\tA1\tA1:A3\n"), limits)
+	require.NoError(t, err)
+	assert.Equal(t, "7\n7\n7\n", string(out.Text()))
+}
+
+// TestApplyReturnsNoDocumentOnRefusal pins the atomicity contract on the
+// *returned* value: a refused batch yields the zero Document, so a caller that
+// ignores the error cannot persist a half-applied grid.
+func TestApplyReturnsNoDocumentOnRefusal(t *testing.T) {
+	limits := engine.Limits{ResultCells: 10, GridDim: 2, ResultBytes: 100}
+	out, err := engine.Apply(parseDoc(t, "1\t2\n"), parseEdits(t, "setCell\tA1\tok\nsetCell\tE9\tfar\n"), limits)
+	require.Error(t, err)
+	assert.Empty(t, string(out.Text()), "a refused batch returns no document, not a partial one")
+}
+
+// TestEditsTextIsACopy pins immutability: a caller mutating the returned bytes
+// cannot reach into the parsed Edits.
+func TestEditsTextIsACopy(t *testing.T) {
+	edits := parseEdits(t, "setCell\tA1\tx\n")
+	first := edits.Text()
+	first[0] = 'X'
+	assert.Equal(t, "setCell\tA1\tx\n", string(edits.Text()))
+}
+
+// TestParseEditsLastBaseWins pins the metadata rule for a repeated key, and
+// that a base line below the ops still governs the batch.
+func TestParseEditsLastBaseWins(t *testing.T) {
+	edits := parseEdits(t, "#.base\taaa\nsetCell\tA1\tx\n#.base\tbbb\n")
+	assert.Equal(t, engine.RevisionHex("bbb"), edits.Base())
+}
+
 func TestApplyPreservesComments(t *testing.T) {
 	assert.Equal(t, "#. header\n1\t9\n", applied(t, "#. header\n1\t2\n", "setCell\tB1\t9\n"))
 }

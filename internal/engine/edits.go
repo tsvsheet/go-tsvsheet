@@ -48,7 +48,10 @@ type Edits struct {
 }
 
 // Base returns the `#.base` revision the document was authored against, or ""
-// when it names none (an unconditional batch).
+// when it names none (an unconditional batch). A batch naming several bases
+// keeps the last, matching the metadata rule that a repeated key is a
+// re-declaration; position carries no meaning, so a base line below the ops
+// still governs the whole batch.
 func (e Edits) Base() RevisionHex { return e.base }
 
 // Len is the number of operations (comment and metadata lines are not ops).
@@ -98,7 +101,11 @@ func Apply(d Document, e Edits, limits Limits) (Document, error) {
 }
 
 // splitEditLines splits src into lines, without a trailing empty element when
-// src ends in a newline.
+// src ends in a newline. A CRLF terminator loses its CR: the grid's own reader
+// strips it, so a CR carried into a cell would store text that does not
+// survive a re-read — the document would stop being a fixed point of
+// parse∘serialize and its content address would name bytes other than the ones
+// on disk.
 func splitEditLines(src []byte) []string {
 	if len(src) == 0 {
 		return nil
@@ -107,8 +114,14 @@ func splitEditLines(src []byte) []string {
 	if lines[len(lines)-1] == "" {
 		lines = lines[:len(lines)-1]
 	}
+	for i, line := range lines {
+		lines[i] = strings.TrimSuffix(line, carriageReturn)
+	}
 	return lines
 }
+
+// carriageReturn is the CR a CRLF line terminator leaves behind.
+const carriageReturn = "\r"
 
 // parseEditLine classifies one line: comment and blank lines yield at most a
 // base revision, data lines yield an op.
@@ -276,7 +289,24 @@ func parseFill(at editLine, args []string) (editApply, error) {
 	if err != nil {
 		return nil, err
 	}
-	return func(d Document, _ Limits) (Document, error) { return d.Fill(from, to), nil }, nil
+	return func(d Document, limits Limits) (Document, error) {
+		// Document.Fill takes no limits, so the bound is enforced here —
+		// otherwise one short line could grow the grid without ceiling.
+		if err := withinGrid(to, limits); err != nil {
+			return Document{}, err
+		}
+		return d.Fill(from, to), nil
+	}, nil
+}
+
+// withinGrid refuses a target rectangle reaching beyond the grid limit,
+// mirroring the validation Set applies to a single address.
+func withinGrid(to Span, limits Limits) error {
+	corner := Address{Row: max(to.From.Row, to.To.Row), Col: max(to.From.Col, to.To.Col)}
+	if corner.Row >= limits.GridDim || corner.Col >= limits.GridDim {
+		return constants.ErrInvalidValue.With(nil, "span exceeds the grid limit", corner.String())
+	}
+	return nil
 }
 
 // parsePaste parses `paste <target> <origin> <base64-block>` — the block is

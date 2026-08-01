@@ -62,6 +62,25 @@ const (
 	legacyMarker    = "# "
 )
 
+// WouldStartCommentLine reports whether text placed in a row's first cell
+// would make the serialized line a comment — which would delete that row from
+// the grid on the next read, silently shifting every address below it. An edit
+// that would do this is refused rather than written, because the language has
+// no escape for a leading marker (SPECIFICATION §3); the shebang form is
+// refused in any row, since a row can become line 1 under a later edit.
+func WouldStartCommentLine(at Address, text CellText) bool {
+	if at.Col != 0 {
+		return false
+	}
+	line := string(text)
+	return strings.HasPrefix(line, shebangMarker) ||
+		strings.HasPrefix(line, directiveMarker) ||
+		strings.HasPrefix(line, legacyMarker)
+}
+
+// CellText is a cell's source text as an editor supplies it.
+type CellText string
+
 // IsCommentLine reports whether the line at 1-based position at is one the grid
 // skips: a first-line `#!` shebang, a `#.` directive-or-comment line, or a
 // legacy `# ` hash-space comment. Everything else is data — including `#N/A`
