@@ -9,4 +9,11 @@ const (
 	ErrNotFound     = constants.ErrNotFound
 	ErrReadInput    = constants.ErrReadInput
 	ErrWriteFile    = constants.ErrWriteFile
+
+	ErrEditsAddress = constants.ErrEditsAddress
+	ErrEditsApply   = constants.ErrEditsApply
+	ErrEditsArity   = constants.ErrEditsArity
+	ErrEditsBase    = constants.ErrEditsBase
+	ErrEditsBlock   = constants.ErrEditsBlock
+	ErrEditsOp      = constants.ErrEditsOp
 )

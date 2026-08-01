@@ -9,6 +9,12 @@ import errs "github.com/gomatic/go-error"
 
 // Keep these constants sorted alphabetically.
 const (
+	ErrEditsAddress errs.Const = "invalid edits address"
+	ErrEditsApply   errs.Const = "edits op refused"
+	ErrEditsArity   errs.Const = "wrong edits argument count"
+	ErrEditsBase    errs.Const = "edits base mismatch"
+	ErrEditsBlock   errs.Const = "invalid edits block"
+	ErrEditsOp      errs.Const = "unknown edits op"
 	ErrInvalidValue errs.Const = "invalid value"
 	ErrNotFound     errs.Const = "not found"
 	ErrReadInput    errs.Const = "failed to read input"
