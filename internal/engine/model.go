@@ -115,8 +115,10 @@ func (s Sheet) scalarText(values [][]Value, at Address) string {
 func (s Sheet) spillArrays(out Grid, values [][]Value) {
 	for r := range values {
 		for c := range values[r] {
-			if values[r][c].kind == kindArray {
+			switch values[r][c].kind {
+			case kindArray:
 				s.spill(out, Address{Row: r, Col: c}, values[r][c].arr)
+			default:
 			}
 		}
 	}

@@ -143,10 +143,12 @@ func directiveOf(key, value fieldText, at LineNumber) (Directive, error) {
 	if err != nil {
 		return Directive{}, err
 	}
-	if k == KeyFreeze {
+	switch k {
+	case KeyFreeze:
 		if err := freezeTouchesEdge(parsed); err != nil {
 			return Directive{}, err
 		}
+	default:
 	}
 	return Directive{Key: k, Value: parsed, At: at}, nil
 }

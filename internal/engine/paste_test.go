@@ -4,6 +4,7 @@ import (
 	"errors"
 	"math"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -261,12 +262,27 @@ func TestPaddedLeavesNoStaleDataUnderAPastedRectangle(t *testing.T) {
 
 // TestPasteBoundsNeverWrapsOnAnUntrustedRow pins that a row at Atoi's ceiling
 // cannot wrap `at.Row+len(block)` negative and slip past GridDim: the bound is
-// subtraction-shaped, refusing immediately, never after allocation.
+// subtraction-shaped, refusing immediately, never after allocation. The call
+// runs under a deadline so a regression FAILS with a diagnosis instead of
+// allocating until the runner dies.
 func TestPasteBoundsNeverWrapsOnAnUntrustedRow(t *testing.T) {
 	t.Parallel()
 
 	s := parse(t, "x\n")
-	huge := addr(math.MaxInt-1, 0)
-	_, err := s.Paste(huge, addr(0, 0), block([]string{"a"}, []string{"b"}), engine.DefaultLimits())
-	assert.ErrorIs(t, err, constants.ErrInvalidValue)
+	done := make(chan error, 1)
+	go func() {
+		_, err := s.Paste(
+			addr(math.MaxInt-1, 0),
+			addr(0, 0),
+			block([]string{"a"}, []string{"b"}),
+			engine.DefaultLimits(),
+		)
+		done <- err
+	}()
+	select {
+	case err := <-done:
+		assert.ErrorIs(t, err, constants.ErrInvalidValue)
+	case <-time.After(10 * time.Second):
+		t.Fatal("no refusal within 10s — the wrapped bound authorised the paste")
+	}
 }

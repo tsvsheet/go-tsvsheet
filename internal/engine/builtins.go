@@ -10,8 +10,10 @@ import (
 // false), and a non-numeric string is #VALUE!.
 func numerics(args []Value) (nums []float64, bad Value, isOK bool) {
 	for _, arg := range args {
-		if arg.kind == kindEmpty {
+		switch arg.kind {
+		case kindEmpty:
 			continue
+		default:
 		}
 		n, v := arg.asNumber()
 		if v.isError() {
@@ -68,8 +70,10 @@ func extreme(args []Value, pick func(a, b float64) float64) Value {
 func fnCountNumbers(args []Value) Value {
 	count := 0
 	for _, arg := range args {
-		if arg.kind == kindNumber || arg.kind == kindDate {
+		switch arg.kind {
+		case kindNumber, kindDate:
 			count++
+		default:
 		}
 	}
 	return numberValue(floatVal(count))
@@ -81,7 +85,9 @@ func fnCountNumbers(args []Value) Value {
 func fnCount(args []Value) Value {
 	count := 0
 	for _, arg := range args {
-		if arg.kind != kindEmpty {
+		switch arg.kind {
+		case kindEmpty:
+		default:
 			count++
 		}
 	}

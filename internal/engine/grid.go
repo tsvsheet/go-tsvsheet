@@ -6,6 +6,7 @@ package engine
 
 import (
 	"bufio"
+	"bytes"
 	"io"
 	"strings"
 
@@ -103,6 +104,7 @@ func IsCommentLine(at LineNumber, text SourceLine) bool {
 func scanLines(r io.Reader, fn func(text string, isComment bool)) error {
 	scanner := bufio.NewScanner(r)
 	scanner.Buffer(make([]byte, 0, bufio.MaxScanTokenSize), maxLineBytes)
+	scanner.Split(scanLine)
 
 	lineNum := LineNumber(0)
 	for scanner.Scan() {
@@ -117,15 +119,76 @@ func scanLines(r io.Reader, fn func(text string, isComment bool)) error {
 }
 
 // maxLineBytes bounds a single scanned row (1 MiB) so a pathological input
-// cannot exhaust memory silently.
+// cannot exhaust memory silently. The bound applies per CR/LF-terminated
+// segment: since scanLine treats a lone CR as a terminator, an input whose
+// only breaks are CRs now scans as bounded rows where it was formerly one
+// over-long token — a deliberate relaxation; a terminator-free run over the
+// bound is still refused.
 const maxLineBytes = 1 << 20
+
+// scanLine is the bufio.SplitFunc for .tsvt lines: LF, CRLF, and a lone CR
+// each terminate a line — the same normalization ParseBlock applies to
+// clipboard text. bufio's default split strips only a CR sitting before an LF,
+// so a lone CR survived into cell text, where no TSV delimiter may live: the
+// canonical serialization wrote it back mid-line and the round-trip broke
+// (FuzzParseDocument's "\r\r" parsed to a cell holding a bare CR).
+var scanLine bufio.SplitFunc = func(data []byte, isAtEOF bool) (advance int, token []byte, err error) {
+	i := bytes.IndexAny(data, "\r\n")
+	if i < 0 {
+		if isAtEOF && len(data) > 0 {
+			return len(data), data, nil
+		}
+		return 0, nil, nil
+	}
+	if data[i] == '\n' {
+		return i + 1, data[:i], nil
+	}
+	return crLine(data, terminatorAt(i), isFinal(isAtEOF))
+}
+
+// terminatorAt is the index of a line terminator within a scan buffer.
+type terminatorAt int
+
+// isFinal reports whether the scanner has reached the end of its input.
+type isFinal bool
+
+// crLine terminates a line at a CR, consuming a following LF as part of the
+// same CRLF terminator; mid-stream, with the CR as the last buffered byte, it
+// asks for one more byte to tell a lone CR from a split CRLF.
+func crLine(data []byte, at terminatorAt, isEOF isFinal) (advance int, token []byte, err error) {
+	if int(at)+1 < len(data) {
+		if data[at+1] == '\n' {
+			return int(at) + 2, data[:at], nil
+		}
+		return int(at) + 1, data[:at], nil
+	}
+	if isEOF {
+		return int(at) + 1, data[:at], nil
+	}
+	return 0, nil, nil
+}
 
 // WriteTSV writes the grid as tab-separated rows, each terminated by a newline.
 // A write failure surfaces as constants.ErrWriteFile. Callers wanting buffering
 // pass a bufio.Writer; WriteTSV writes each row directly so a write error is
 // reported at its source.
+//
+// A row whose first cell would serialize to a comment-reading line (a leading
+// `#!`, `#.`, or `# ` — WouldStartCommentLine's rule) is refused as
+// constants.ErrInvalidValue rather than written: the language has no escape
+// for a leading marker, so the emitted line would read back as a comment and
+// the row would silently vanish on the next read — data loss dressed as
+// output. (FuzzReadTSV found the shape: a document may legally hold `#!x` as
+// data below its comment lines, but the bare-grid format cannot represent it.)
 func WriteTSV(w io.Writer, g Grid) error {
-	for _, row := range g {
+	for r, row := range g {
+		if len(row) > 0 && WouldStartCommentLine(Address{Row: r}, CellText(row[0])) {
+			return constants.ErrInvalidValue.With(
+				nil,
+				"row would read back as a comment line",
+				Address{Row: r}.String(),
+			)
+		}
 		if _, err := io.WriteString(w, strings.Join(row, tab)+newline); err != nil {
 			return constants.ErrWriteFile.With(err)
 		}

@@ -243,10 +243,12 @@ func (r resolver) evalMatrix(arg tsvt.Expr) (block [][]Value, refused Value) {
 	if v.isRefusal() {
 		return nil, v
 	}
-	if v.kind == kindArray {
+	switch v.kind {
+	case kindArray:
 		return v.arr, Value{}
+	default:
+		return [][]Value{{v}}, Value{}
 	}
-	return [][]Value{{v}}, Value{}
 }
 
 // rangeMatrix resolves an A1 reference to its rows×columns of values; an

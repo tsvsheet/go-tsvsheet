@@ -154,10 +154,12 @@ func fnExact(args []Value) Value {
 
 // fnT is the operand's text if it is text, else the empty string.
 func fnT(args []Value) Value {
-	if args[0].kind == kindString {
+	switch args[0].kind {
+	case kindString:
 		return args[0]
+	default:
+		return stringValue("")
 	}
-	return stringValue("")
 }
 
 // fnConcatenate joins the text forms of its operands (Excel CONCATENATE).
@@ -286,8 +288,10 @@ func fnCode(args []Value) Value {
 // fnValue parses text as a number; non-numeric text is #VALUE!.
 func fnValue(args []Value) Value {
 	v := value(textVal(strings.TrimSpace(argText(args, 0))))
-	if v.kind == kindNumber {
+	switch v.kind {
+	case kindNumber:
 		return v
+	default:
+		return errorValue(ErrValue)
 	}
-	return errorValue(ErrValue)
 }

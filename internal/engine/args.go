@@ -65,10 +65,12 @@ func (r resolver) argValues(args []tsvt.Expr, spec paramModes) []Value {
 // array reduces to its top-left element per the pinned no-broadcasting rule.
 func (r resolver) argScalar(arg tsvt.Expr) Value {
 	v := r.eval(arg)
-	if v.kind == kindArray {
+	switch v.kind {
+	case kindArray:
 		return v.arr[0][0]
+	default:
+		return v
 	}
-	return v
 }
 
 // argCells expands one argument: a bare reference contributes all its resolved
@@ -81,8 +83,10 @@ func (r resolver) argCells(arg tsvt.Expr) []Value {
 		return r.resolveOperand(ref.Ref).values
 	}
 	v := r.eval(arg)
-	if v.kind == kindArray {
+	switch v.kind {
+	case kindArray:
 		return flatten1D(v.arr)
+	default:
+		return []Value{v}
 	}
-	return []Value{v}
 }

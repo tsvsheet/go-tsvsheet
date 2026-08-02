@@ -13,10 +13,12 @@ const (
 
 // foreignError maps a non-OK status to the error value the reference yields.
 func foreignError(status foreignStatus) ErrorValue {
-	if status == foreignCycle {
+	switch status {
+	case foreignCycle:
 		return ErrCirc
+	default:
+		return ErrRef
 	}
-	return ErrRef
 }
 
 // foreign loads and computes the sheet named by a `"file"!` qualifier (resolved
@@ -42,7 +44,9 @@ func (r resolver) foreign(file string) (computer, foreignStatus) {
 // sheet; an unresolvable target is a single #REF!/#CIRC! value.
 func (r resolver) foreignCells(ref tsvt.RangeRef) cellset {
 	target, status := r.foreign(ref.File)
-	if status != foreignOK {
+	switch status {
+	case foreignOK:
+	default:
 		return cellset{values: []Value{refusalValue(foreignError(status))}, isSingle: boolResult(ref.To == nil)}
 	}
 	return resolver{comp: target}.resolveOperand(stripFile(ref))
@@ -52,7 +56,9 @@ func (r resolver) foreignCells(ref tsvt.RangeRef) cellset {
 // the target sheet; an unresolvable target is a 1×1 #REF!/#CIRC! block.
 func (r resolver) foreignMatrix(ref tsvt.RangeRef) [][]Value {
 	target, status := r.foreign(ref.File)
-	if status != foreignOK {
+	switch status {
+	case foreignOK:
+	default:
 		return [][]Value{{refusalValue(foreignError(status))}}
 	}
 	return resolver{comp: target}.rangeMatrix(stripFile(ref))

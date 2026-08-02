@@ -3,6 +3,7 @@ package engine_test
 import (
 	"math"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -249,6 +250,15 @@ func TestPasteIntoSpanAreaNeverWrapsOnMultiplication(t *testing.T) {
 	s := parse(t, "1\n")
 	limits := engine.Limits{ResultCells: 10, GridDim: math.MaxInt, ResultBytes: 100}
 	wide := span(0, 0, 3037000499, 3037000499) // 3037000500^2 wraps negative in int64
-	_, err := s.PasteInto(wide, addr(0, 0), block([]string{"a"}), limits)
-	assert.ErrorIs(t, err, constants.ErrInvalidValue)
+	done := make(chan error, 1)
+	go func() {
+		_, err := s.PasteInto(wide, addr(0, 0), block([]string{"a"}), limits)
+		done <- err
+	}()
+	select {
+	case err := <-done:
+		assert.ErrorIs(t, err, constants.ErrInvalidValue)
+	case <-time.After(10 * time.Second):
+		t.Fatal("no refusal within 10s — the wrapped area authorised the span")
+	}
 }

@@ -112,10 +112,21 @@ func excelTree(expr tsvt.Expr) tsvt.Expr {
 	}
 }
 
+// isPow reports whether op is the power operator, as an exhaustive-friendly
+// predicate for the precedence rewrites below.
+func isPow(op tsvt.BinaryOp) bool {
+	switch op {
+	case tsvt.OpPow:
+		return true
+	default:
+		return false
+	}
+}
+
 // signBindsTighter turns `-(x^y)` into `(-x)^y`, Excel's reading of `-x^y`.
 func signBindsTighter(node tsvt.Unary) tsvt.Expr {
 	power, isPower := node.X.(tsvt.Binary)
-	if !isPower || power.Op != tsvt.OpPow || power.IsGrouped {
+	if !isPower || !isPow(power.Op) || power.IsGrouped {
 		return node
 	}
 	lifted := tsvt.Unary{Op: node.Op, X: power.Left}
@@ -125,7 +136,7 @@ func signBindsTighter(node tsvt.Unary) tsvt.Expr {
 // groupsLeftward turns `x^(y^z)` into `(x^y)^z`, Excel's reading of `x^y^z`.
 func groupsLeftward(node tsvt.Binary) tsvt.Expr {
 	inner, isPower := node.Right.(tsvt.Binary)
-	if node.Op != tsvt.OpPow || !isPower || inner.Op != tsvt.OpPow || inner.IsGrouped {
+	if !isPow(node.Op) || !isPower || !isPow(inner.Op) || inner.IsGrouped {
 		return node
 	}
 	rebased := groupsLeftward(tsvt.Binary{Op: tsvt.OpPow, Left: node.Left, Right: inner.Left})

@@ -130,8 +130,10 @@ func rankPick(args []Value, isLargest boolResult) Value {
 func fnCountblank(args []Value) Value {
 	count := 0
 	for _, arg := range args {
-		if arg.kind == kindEmpty {
+		switch arg.kind {
+		case kindEmpty:
 			count++
+		default:
 		}
 	}
 	return numberValue(floatVal(count))
