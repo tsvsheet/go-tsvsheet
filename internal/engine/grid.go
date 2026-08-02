@@ -54,8 +54,8 @@ type SourceLine string
 // directiveMarker opens a directive or comment line anywhere; legacyMarker is
 // the superseded hash-space comment form, still accepted so that sheets and
 // share links written before the change keep parsing. No marker involves
-// whitespace except the legacy one — which is exactly why it was superseded, a
-// space being indistinguishable from the TAB that separates fields.
+// whitespace except the legacy one — which is why it was superseded, a space
+// being indistinguishable from the TAB that separates fields.
 const (
 	shebangMarker   = "#!"
 	directiveMarker = "#."

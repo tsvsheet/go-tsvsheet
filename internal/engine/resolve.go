@@ -162,7 +162,8 @@ func (r resolver) hull(a, b Address) []Value {
 }
 
 // a1Address converts an A1 cell to a 0-based (row, col). ok is false for a row
-// below 1 (`A0`); the grammar guarantees a column label and an integer row.
+// below 1 (`A0`); the grammar admits only a column label followed by an integer
+// row, so no other shape reaches here.
 func a1Address(cell tsvt.CellRef) (Address, boolResult) {
 	if cell.Row < 1 {
 		return Address{}, false

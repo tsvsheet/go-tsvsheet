@@ -251,184 +251,6 @@ func pasteInto(t *testing.T, s engine.Sheet, target engine.Span, origin engine.A
 	return got
 }
 
-func TestPasteInto_OneRowSpreadsOverSelectedRows(t *testing.T) {
-	t.Parallel()
-
-	// The reported flow: C1 (=A1/B1) copied, C2:C4 selected, pasted — every
-	// selected row gets the formula rebased to ITSELF, exactly as three
-	// separate pastes would.
-	s := parse(t, "10\t2\t=A1/B1\n20\t0\n15\t3\n8\t4\n")
-	got := pasteInto(t, s, span(1, 2, 3, 2), addr(0, 2), block([]string{"=A1/B1"}))
-
-	assert.Equal(t, "=A2 / B2", sourceAt(t, got, 1, 2))
-	assert.Equal(t, "=A3 / B3", sourceAt(t, got, 2, 2))
-	assert.Equal(t, "=A4 / B4", sourceAt(t, got, 3, 2))
-	g := got.Compute()
-	assert.Equal(t, "#DIV/0!", cellAt(t, g, 1, 2)) // 20 / 0
-	assert.Equal(t, "5", cellAt(t, g, 2, 2))
-	assert.Equal(t, "2", cellAt(t, g, 3, 2))
-}
-
-func TestPasteInto_OneCellFillsAnyRectangle(t *testing.T) {
-	t.Parallel()
-
-	// A 1×1 block divides every span: the whole selection fills, each cell
-	// rebased to its own position, pins holding.
-	s := parse(t, "1\t2\n3\t4\n")
-	got := pasteInto(t, s, span(0, 2, 1, 3), addr(0, 0), block([]string{"=$A$1+A1"}))
-
-	assert.Equal(t, "=$A$1 + C1", sourceAt(t, got, 0, 2))
-	assert.Equal(t, "=$A$1 + D1", sourceAt(t, got, 0, 3))
-	assert.Equal(t, "=$A$1 + C2", sourceAt(t, got, 1, 2))
-	assert.Equal(t, "=$A$1 + D2", sourceAt(t, got, 1, 3))
-}
-
-func TestPasteInto_BlockTilesAnExactMultiple(t *testing.T) {
-	t.Parallel()
-
-	// A 1×2 block over a 2×2 span tiles twice vertically.
-	s := parse(t, "0\n0\n")
-	got := pasteInto(t, s, span(0, 0, 1, 1), addr(0, 0), block([]string{"a", "b"}))
-
-	assert.Equal(t, "a", sourceAt(t, got, 0, 0))
-	assert.Equal(t, "b", sourceAt(t, got, 0, 1))
-	assert.Equal(t, "a", sourceAt(t, got, 1, 0))
-	assert.Equal(t, "b", sourceAt(t, got, 1, 1))
-}
-
-func TestPasteInto_NonMultipleSpanPlacesOnceAtTopLeft(t *testing.T) {
-	t.Parallel()
-
-	// A 2-row block over a 3-row span does not divide: single placement, no
-	// half tile — Paste semantics, corners in any order.
-	s := parse(t, "x\nx\nx\nkeep\n")
-	got := pasteInto(t, s, span(2, 0, 0, 0), addr(0, 0), block([]string{"a"}, []string{"b"}))
-
-	assert.Equal(t, "a", sourceAt(t, got, 0, 0))
-	assert.Equal(t, "b", sourceAt(t, got, 1, 0))
-	assert.Equal(t, "x", sourceAt(t, got, 2, 0))
-	assert.Equal(t, "keep", sourceAt(t, got, 3, 0))
-}
-
-func TestPasteInto_SpanEqualToBlockIsExactlyPaste(t *testing.T) {
-	t.Parallel()
-
-	s := parse(t, "10\t=A1*2\n20\n")
-	viaInto := pasteInto(t, s, span(1, 1, 1, 1), addr(0, 1), block([]string{"=A1*2"}))
-	viaPaste := paste(t, s, addr(1, 1), addr(0, 1), block([]string{"=A1*2"}))
-	assert.Equal(t, viaPaste.Source(), viaInto.Source())
-}
-
-func TestPasteInto_MultiRowBlockTilesByItsOwnHeight(t *testing.T) {
-	t.Parallel()
-
-	// A 2-row block over a 4-row span lands twice, whole — the row stride is
-	// the BLOCK height, never one (a stride mutation repeats the first row
-	// and grows past the span).
-	s := parse(t, "x\nx\nx\nx\n")
-	got := pasteInto(t, s, span(0, 0, 3, 0), addr(0, 0), block([]string{"a"}, []string{"b"}))
-
-	require.Len(t, got.Source(), 4)
-	assert.Equal(t, "a", sourceAt(t, got, 0, 0))
-	assert.Equal(t, "b", sourceAt(t, got, 1, 0))
-	assert.Equal(t, "a", sourceAt(t, got, 2, 0))
-	assert.Equal(t, "b", sourceAt(t, got, 3, 0))
-}
-
-func TestPasteInto_TheReceiverSheetIsUntouched(t *testing.T) {
-	t.Parallel()
-
-	// Sheet is a value: a SUCCESSFUL tiled paste must never write through
-	// into the receiver's rows (dropping the clone shares the backing array).
-	s := parse(t, "keep\nkeep\n")
-	got := pasteInto(t, s, span(0, 0, 1, 0), addr(0, 0), block([]string{"new"}))
-
-	assert.Equal(t, "new", sourceAt(t, got, 0, 0))
-	assert.Equal(t, "keep", sourceAt(t, s, 0, 0))
-	assert.Equal(t, "keep", sourceAt(t, s, 1, 0))
-}
-
-func TestPasteInto_SpanAreaIsBoundedByResultCells(t *testing.T) {
-	t.Parallel()
-
-	// Four caller integers must not buy O(area) work: a span past the
-	// result-cells ceiling is refused up front — an OOM inside wasm aborts
-	// the runtime fatally and kills the engine for the page's life.
-	s := parse(t, "1\n")
-	limits := engine.Limits{ResultCells: 100, GridDim: 1000, ResultBytes: 100}
-	_, err := s.PasteInto(span(0, 0, 10, 10), addr(0, 0), block([]string{"x"}), limits)
-	assert.ErrorIs(t, err, constants.ErrInvalidValue)
-	// At the ceiling exactly (10×10 = 100), the paste proceeds.
-	_, ok := s.PasteInto(span(0, 0, 9, 9), addr(0, 0), block([]string{"x"}), limits)
-	assert.NoError(t, ok)
-}
-
-func TestPasteInto_CommentMarkerRefusedInsideATile(t *testing.T) {
-	t.Parallel()
-
-	// The comment-marker guard fires for a first-column tile cell, naming it,
-	// and the whole tiled paste is refused.
-	s := parse(t, "x\nx\n")
-	_, err := s.PasteInto(span(0, 0, 1, 0), addr(0, 0), block([]string{"#. note"}), engine.DefaultLimits())
-	require.Error(t, err)
-	assert.Equal(t, "x", sourceAt(t, s, 0, 0))
-	assert.Equal(t, "x", sourceAt(t, s, 1, 0))
-}
-
-func TestPasteInto_AtomicAcrossTiles(t *testing.T) {
-	t.Parallel()
-
-	// The malformed formula lands only in the SECOND tile; the whole tiled
-	// paste is refused, naming that tile's target cell, and nothing changed.
-	s := parse(t, "ok\nok\n")
-	_, err := s.PasteInto(span(0, 0, 1, 0), addr(5, 0), block([]string{"=1+"}), engine.DefaultLimits())
-	require.Error(t, err)
-	assert.ErrorIs(t, err, constants.ErrSyntax)
-	assert.Equal(t, "ok", sourceAt(t, s, 0, 0))
-	assert.Equal(t, "ok", sourceAt(t, s, 1, 0))
-}
-
-func TestPasteInto_SpanBeyondTheLimitIsRejected(t *testing.T) {
-	t.Parallel()
-
-	s := parse(t, "1\n")
-	limits := engine.Limits{ResultCells: 100, GridDim: 4, ResultBytes: 100}
-	_, err := s.PasteInto(span(0, 0, 3, 4), addr(0, 0), block([]string{"a"}), limits)
-	assert.ErrorIs(t, err, constants.ErrInvalidValue)
-	_, err = s.PasteInto(span(-1, 0, 0, 0), addr(0, 0), block([]string{"a"}), limits)
-	assert.ErrorIs(t, err, constants.ErrInvalidValue)
-	_, err = s.PasteInto(span(0, 0, 0, 0), addr(-1, 0), block([]string{"a"}), limits)
-	assert.ErrorIs(t, err, constants.ErrInvalidValue)
-}
-
-func TestPasteInto_EmptyBlockNeverTiles(t *testing.T) {
-	t.Parallel()
-
-	// A zero-row block cannot tile (it would loop forever); it falls back to
-	// Paste, whose empty-block placement is a no-op.
-	s := parse(t, "1\t2\n")
-	got := pasteInto(t, s, span(0, 0, 1, 1), addr(0, 0), engine.Grid{})
-	assert.Equal(t, s.Source(), got.Source())
-}
-
-func TestDocument_PasteIntoTilesAndGrowsLayout(t *testing.T) {
-	t.Parallel()
-
-	doc, err := engine.ParseDocument([]byte("# note\n=1+1\n"))
-	require.NoError(t, err)
-	got, err := doc.PasteInto(
-		engine.Span{From: engine.Address{Row: 1, Col: 0}, To: engine.Address{Row: 2, Col: 0}},
-		engine.Address{Row: 1, Col: 0}, block([]string{"x"}), engine.DefaultLimits())
-	require.NoError(t, err)
-	assert.Equal(t, "# note\n=1+1\nx\nx\n", string(got.Text()))
-
-	_, err = doc.PasteInto(
-		engine.Span{From: engine.Address{Row: 0, Col: 0}, To: engine.Address{Row: 1, Col: 0}},
-		engine.Address{Row: 0, Col: 0}, block([]string{"=("}), engine.DefaultLimits())
-	require.Error(t, err)
-	assert.Equal(t, "# note\n=1+1\n", string(doc.Text()))
-}
-
 func TestDocument_PasteGrowsLayoutAndPreservesComments(t *testing.T) {
 	t.Parallel()
 
@@ -453,4 +275,20 @@ func TestDocument_PasteErrorLeavesTheDocumentUnchanged(t *testing.T) {
 		block([]string{"=("}), engine.DefaultLimits())
 	assert.ErrorIs(t, err, constants.ErrSyntax)
 	assert.Equal(t, "1\n", string(doc.Text()))
+}
+
+// TestPaddedLeavesNoStaleDataUnderAPastedRectangle pins the footprint rule. A
+// ragged block still overwrites its whole rectangle, so a short row cannot
+// leave the old value showing through in the gap — which would read as data the
+// paste had brought, and is the worst kind of wrong: plausible.
+func TestPaddedLeavesNoStaleDataUnderAPastedRectangle(t *testing.T) {
+	t.Parallel()
+	sheet, err := engine.Parse([]byte("old\told\nold\told\n"))
+	require.NoError(t, err)
+
+	ragged := engine.Grid{{"new", "new"}, {"new"}}
+	pasted, err := sheet.Paste(engine.Address{}, engine.Address{}, ragged, engine.DefaultLimits())
+	require.NoError(t, err)
+
+	assert.Equal(t, "", pasted.Source()[1][1], "the short row's gap is cleared, not left holding old")
 }

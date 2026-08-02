@@ -285,3 +285,16 @@ func TestParse_SyntaxErrorNamesCell(t *testing.T) {
 	assert.ErrorIs(t, err, constants.ErrSyntax)
 	assert.Contains(t, err.Error(), "B2")
 }
+
+// TestArgMatrixKeepsARangeAndAnArrayTheSameShape pins that an array-valued
+// argument is consumed exactly like a range, so a lookup reads the block it was
+// given rather than a flattened list of the same cells in the wrong shape.
+func TestArgMatrixKeepsARangeAndAnArrayTheSameShape(t *testing.T) {
+	t.Parallel()
+	sheet, err := engine.Parse([]byte("3\n1\n2\n=index(A1:A3, 2)\t=index(sort(A1:A3), 2)\n"))
+	require.NoError(t, err)
+	computed := sheet.Compute()[3]
+
+	assert.Equal(t, "1", computed[0], "the second row of the range as written")
+	assert.Equal(t, "2", computed[1], "and of the sorted block, read the same way")
+}

@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/tsvsheet/go-tsvsheet/internal/engine"
 )
@@ -151,4 +152,33 @@ func TestCrypto_VerifyErrors(t *testing.T) {
 			assert.Equal(t, string(tc.want), cellAt(t, compute(t, tc.src), 1, 0))
 		})
 	}
+}
+
+// TestDigestAlgoShipsNoBrokenPrimitive pins ADR 0011 §1. A tamper-evidence
+// family whose weakest member is forgeable teaches the wrong lesson by being
+// available at all, so sha1 and md5 are absent rather than deprecated — an
+// unknown function, indistinguishable from a typo, which is the point.
+func TestDigestAlgoShipsNoBrokenPrimitive(t *testing.T) {
+	t.Parallel()
+	sheet, err := engine.Parse([]byte("abc\t=sha1(A1)\t=md5(A1)\t=sha256(A1)\n"))
+	require.NoError(t, err)
+	computed := sheet.Compute()[0]
+
+	assert.Equal(t, "#NAME?", computed[1], "sha1 is not a function here")
+	assert.Equal(t, "#NAME?", computed[2], "nor md5")
+	assert.NotEqual(t, "#NAME?", computed[3], "while a sound digest is")
+}
+
+// TestDecodedTextRefusesBytesThatAreNotText pins the cell contract: a cell
+// holds text, so a decoding that yields bytes which are not valid UTF-8 is an
+// error rather than a cell full of replacement characters.
+func TestDecodedTextRefusesBytesThatAreNotText(t *testing.T) {
+	t.Parallel()
+	// //4= is base64 for 0xFF 0xFE 0x3D — valid base64, invalid UTF-8.
+	sheet, err := engine.Parse([]byte("//4=\t=unbase64(A1)\t=unbase64(\"aGk=\")\n"))
+	require.NoError(t, err)
+	computed := sheet.Compute()[0]
+
+	assert.Equal(t, "#VALUE!", computed[1], "decoded bytes that are not text are refused")
+	assert.Equal(t, "hi", computed[2], "while decoded text arrives as text")
 }

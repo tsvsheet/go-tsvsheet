@@ -248,3 +248,21 @@ func TestImportErrorValuedURLPropagates(t *testing.T) {
 	grid := importGrid(t, "=importcell(1/0)\n", echoFetcher{body: []byte("1\n")}, engine.DefaultLimits())
 	assert.Equal(t, "#DIV/0!", cellAt(t, grid, 0, 0))
 }
+
+// TestFetchResultRequiresTheHandshakeAndTreatsItsURLAsOptional pins both halves
+// of the response contract (ADR 0006 §2). The declared media type must match
+// what was asked for, because a server answering a range request with a cell
+// payload is a misunderstanding, not a value. The URL is informational: it
+// feeds EXPLAIN so an author can see where a value came from, nothing in the
+// compute path reads it, and a fetcher that cannot know it — the engine never
+// resolves a relative source itself — is still a valid fetcher.
+func TestFetchResultRequiresTheHandshakeAndTreatsItsURLAsOptional(t *testing.T) {
+	t.Parallel()
+	mismatched := fixedFetcher{result: engine.FetchResult{ContentType: mediaRangeWire, Body: []byte("1\n")}}
+	assert.Equal(t, "#IMPORT!", importGrid(t, "=importcell(\"x\")\n", mismatched, engine.DefaultLimits())[0][0],
+		"a payload of the wrong declared type fails the handshake")
+
+	noURL := fixedFetcher{result: engine.FetchResult{ContentType: mediaCellWire, Body: []byte("7\n")}}
+	assert.Equal(t, "7", importGrid(t, "=importcell(\"x\")\n", noURL, engine.DefaultLimits())[0][0],
+		"and a fetcher that reports no URL still imports")
+}

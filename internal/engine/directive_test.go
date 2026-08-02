@@ -236,3 +236,62 @@ func TestResolveViewIgnoresLegacyComments(t *testing.T) {
 	assert.Empty(t, found)
 	assert.Empty(t, diags)
 }
+
+// TestPairsOfLineKeepsTheReadablePairsBesideAnUnreadableOne pins the recovery
+// rule by name: a directive line is a sequence of independent declarations, so
+// one that cannot be read costs its own pair and nothing else. Abandoning the
+// line would hide every later mistake behind the first.
+func TestPairsOfLineKeepsTheReadablePairsBesideAnUnreadableOne(t *testing.T) {
+	t.Parallel()
+	found, diags := engine.DirectivesOf(linesOf("#.hide\tcols(range(B:B))\thidden\trows(count(1))\n"))
+
+	require.Len(t, diags, 1, "one finding for the one unreadable pair")
+	assert.Len(t, found, 1, "and the pair beside it still declares what it says")
+}
+
+// TestFreezeTouchesEdgeRefusesAPaneAnchoredToNothing pins the one constraint a
+// viewport imposes. A frozen pane floating in the middle of the grid is not a
+// pane, so a range that reaches neither edge is refused rather than rendered as
+// something nobody meant. A count always reaches an edge and is always fine.
+func TestFreezeTouchesEdgeRefusesAPaneAnchoredToNothing(t *testing.T) {
+	t.Parallel()
+	anchored, diags := engine.DirectivesOf(linesOf("#.freeze\trows(count(2))\n"))
+	require.Empty(t, diags)
+	assert.Len(t, anchored, 1, "a count anchors by construction")
+
+	_, floating := engine.DirectivesOf(linesOf("#.freeze\trows(range(5:7))\n"))
+
+	require.Len(t, floating, 1)
+	assert.Contains(t, floating[0].Message, "anchors to an edge")
+}
+
+// TestFindingTextNamesTheSpellingItWants pins the difference between a message
+// that refuses and one that teaches. A diagnostic that only says "no" leaves
+// the author guessing; naming the accepted spelling turns the refusal into the
+// documentation they needed at that moment.
+func TestFindingTextNamesTheSpellingItWants(t *testing.T) {
+	t.Parallel()
+	_, bare := engine.DirectivesOf(linesOf("#.hide\trows(3)\n"))
+
+	require.Len(t, bare, 1)
+	assert.Contains(t, bare[0].Message, "range(3:3)", "the message spells out what to write instead")
+}
+
+// TestNewViewMakesNoDirectiveLookLikeNothingSelected pins why every selection
+// is allocated. A caller forced to tell "no directive" from "nothing selected"
+// would branch on nil at every read site, and the first site to forget would
+// panic on a sheet that simply had no directives — the common case.
+func TestNewViewMakesNoDirectiveLookLikeNothingSelected(t *testing.T) {
+	t.Parallel()
+	bare, err := engine.ParseDocument([]byte("a\tb\n"))
+	require.NoError(t, err)
+	declared, err := engine.ParseDocument([]byte("#.hide\tcols(range(B:B))\na\tb\n"))
+	require.NoError(t, err)
+
+	bareView, _ := bare.View()
+	declaredView, _ := declared.View()
+
+	assert.Empty(t, bareView.HiddenRows, "no directive selects nothing")
+	assert.Empty(t, bareView.HiddenCols)
+	assert.NotEmpty(t, declaredView.HiddenCols, "and a directive selects what it names")
+}

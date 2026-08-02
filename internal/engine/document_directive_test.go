@@ -119,3 +119,34 @@ func TestDocumentDeletesShiftDirectives(t *testing.T) {
 	assert.Contains(t, narrower, "#.hide\tcols(range(B:C))")
 	assert.Contains(t, narrower, "#.header\trows(count(2))", "the row directive is untouched")
 }
+
+// TestShiftDirectiveLineLeavesAnUnreadableLineExactlyAsWritten pins the rule
+// that an edit is no moment to discard someone's text. A line the parser cannot
+// read still belongs to its author, and rewriting or dropping it would destroy
+// work in the middle of an unrelated operation.
+func TestShiftDirectiveLineLeavesAnUnreadableLineExactlyAsWritten(t *testing.T) {
+	t.Parallel()
+	const unreadable = "#.hide\tnonsense(\n"
+	doc, err := engine.ParseDocument([]byte(unreadable + "a\nb\n"))
+	require.NoError(t, err)
+
+	edited := doc.InsertRow(engine.Address{})
+
+	assert.Contains(t, string(edited.Text()), unreadable, "the line survives the edit verbatim")
+}
+
+// TestShiftDirectiveFieldKeepsAnUntouchedLineByteIdentical pins that an edit
+// rewrites only what it moved. Re-rendering an untouched directive into
+// canonical form would put an unrelated diff in front of a reviewer and lose
+// whichever equivalent spelling its author chose.
+func TestShiftDirectiveFieldKeepsAnUntouchedLineByteIdentical(t *testing.T) {
+	t.Parallel()
+	const untouched = "#.header\tcols(count(1))\n"
+	doc, err := engine.ParseDocument([]byte(untouched + "a\tb\nc\td\n"))
+	require.NoError(t, err)
+
+	edited := doc.InsertRow(engine.Address{Row: 1})
+
+	assert.Contains(t, string(edited.Text()), untouched,
+		"a column directive is untouched by a row insert, byte for byte")
+}

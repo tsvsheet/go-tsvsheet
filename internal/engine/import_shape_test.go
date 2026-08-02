@@ -131,3 +131,42 @@ func TestImportOversizeRejected(t *testing.T) {
 		})
 	}
 }
+
+// TestShapeImportRefusesAMismatchRatherThanSalvagingIt pins ADR 0006 §4. An
+// import that quietly took the first cell of a wrong-shaped payload would put
+// data in the sheet that the sheet never asked for, and the author would have
+// no way to notice.
+func TestShapeImportRefusesAMismatchRatherThanSalvagingIt(t *testing.T) {
+	t.Parallel()
+	twoByTwo := fixedFetcher{result: engine.FetchResult{
+		ContentType: mediaCellWire, Body: []byte("1\t2\n3\t4\n"),
+	}}
+
+	got := importGrid(t, "=importcell(\"x\")\n", twoByTwo, engine.DefaultLimits())
+
+	assert.Equal(t, "#IMPORT!", got[0][0], "a 2x2 payload is not a cell, and is not salvaged into one")
+}
+
+// TestImportScalarTakesExactlyOneRowOfOneCell pins the other side: the shape
+// IMPORTCELL does accept.
+func TestImportScalarTakesExactlyOneRowOfOneCell(t *testing.T) {
+	t.Parallel()
+	single := fixedFetcher{result: engine.FetchResult{ContentType: mediaCellWire, Body: []byte("42\n")}}
+
+	got := importGrid(t, "=importcell(\"x\")\n", single, engine.DefaultLimits())
+
+	assert.Equal(t, "42", got[0][0])
+}
+
+// TestAllWidthRequiresEveryRowToHaveTheSameColumnCount pins the ragged-payload
+// rule: a range import is a rectangle or it is an error.
+func TestAllWidthRequiresEveryRowToHaveTheSameColumnCount(t *testing.T) {
+	t.Parallel()
+	ragged := fixedFetcher{result: engine.FetchResult{
+		ContentType: mediaRangeWire, Body: []byte("1\t2\n3\n"),
+	}}
+
+	got := importGrid(t, "=importrange(\"x\")\n", ragged, engine.DefaultLimits())
+
+	assert.Equal(t, "#IMPORT!", got[0][0], "a ragged payload is not a range")
+}

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/tsvsheet/go-tsvsheet/internal/engine"
 )
@@ -69,4 +70,19 @@ func TestURL_DecodeIsPercentOnly(t *testing.T) {
 	assert.Equal(t, "a+b", formula1(t, `urldecode("a+b")`)) // "+" is not a space
 	assert.Equal(t, string(engine.ErrValue), formula1(t, `urldecode("%zz")`))
 	assert.Equal(t, string(engine.ErrValue), formula1(t, `urldecode("%ff")`)) // not UTF-8
+}
+
+// TestFnURLEncodeWritesASpaceAsPercentTwenty pins the one byte where the two
+// common encodings disagree. Go's url.QueryEscape writes "+", which is correct
+// for a query string and wrong everywhere else in a URL; Sheets' ENCODEURL
+// writes %20, and a value pasted into a path must survive.
+func TestFnURLEncodeWritesASpaceAsPercentTwenty(t *testing.T) {
+	t.Parallel()
+	sheet, err := engine.Parse([]byte("a b\t=urlencode(A1)\t=urlencode(\"a~b-c_d.e\")\n"))
+	require.NoError(t, err)
+	computed := sheet.Compute()[0]
+
+	assert.Equal(t, "a%20b", computed[1])
+	assert.NotContains(t, computed[1], "+")
+	assert.Equal(t, "a~b-c_d.e", computed[2], "the unreserved set is left alone")
 }

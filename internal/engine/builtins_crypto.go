@@ -37,8 +37,8 @@ func hashNamed(algo digestAlgo) (func() hash.Hash, boolResult) {
 	}
 }
 
-// writeAll feeds text to a hash; hash.Hash.Write never returns an error (its
-// documented contract), so the counts are discarded.
+// writeAll feeds text to a hash. hash.Hash.Write reports no error by its
+// documented contract, so the counts are discarded.
 func writeAll(h hash.Hash, text textVal) {
 	_, _ = h.Write([]byte(text))
 }

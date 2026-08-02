@@ -20,7 +20,8 @@ import (
 type Key int
 
 // The three keys, one per class — a projection, a structure declaration, and a
-// viewport hint. A grid has exactly two axes, and the axis lives in the value.
+// viewport hint. A grid has two axes, and which one a directive means lives in
+// its value rather than in a key per axis.
 const (
 	KeyHide Key = iota
 	KeyHeader

@@ -177,3 +177,14 @@ func TestParseDocumentRoundTripsBothMarkers(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, src, string(doc.Text()))
 }
+
+// TestMaxLineBytesBoundsASingleScannedRow pins the memory ceiling on input. A
+// scanner with no bound turns one pathological line into an allocation the
+// caller never asked for and cannot catch — in the wasm build a fatal abort
+// that kills the engine for the page's life.
+func TestMaxLineBytesBoundsASingleScannedRow(t *testing.T) {
+	t.Parallel()
+	_, err := engine.Parse([]byte(strings.Repeat("a", 2<<20) + "\n"))
+
+	require.Error(t, err, "a line past the ceiling is refused, not allocated")
+}

@@ -1,6 +1,7 @@
 package engine_test
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -90,4 +91,24 @@ func TestExplain_RendersEveryExpressionForm(t *testing.T) {
 			assert.Equal(t, want, trace.Formula)
 		})
 	}
+}
+
+// TestTraceImportReportsTheSourceExactlyAsTheSheetWroteIt pins the one place an
+// author can tell two import failures apart. Every failure is the same opaque
+// #IMPORT! in the grid by design, so a denied host and a traversal above the
+// data base look identical in a cell; the trace has to carry the source
+// verbatim, or there is nothing left to reason from.
+func TestTraceImportReportsTheSourceExactlyAsTheSheetWroteIt(t *testing.T) {
+	t.Parallel()
+	const source = "../secrets/keys.tsv"
+	sheet, err := engine.Parse([]byte("=importcell(\"" + source + "\")\n"))
+	require.NoError(t, err)
+
+	refusing := fixedFetcher{err: errors.New("host not allowed")}
+	trace, err := engine.ExplainWith(sheet, engine.Address{}, engine.ComputeOptions{Fetcher: refusing})
+	require.NoError(t, err)
+
+	require.Len(t, trace.Imports, 1)
+	assert.Equal(t, source, trace.Imports[0].Source, "the source is reported as written, not as resolved")
+	assert.NotEmpty(t, trace.Imports[0].Error, "and the reason the cell cannot show is here")
 }

@@ -171,3 +171,22 @@ func TestStructuralEdits_UnmovedPinnedFormulaKeepsSpelling(t *testing.T) {
 
 	assert.Equal(t, "=$A$1*2", sourceAt(t, got, 0, 1))
 }
+
+// TestSameReferenceComparesWhatAReferenceNamesNotHowItWasWritten pins the
+// comparison used to decide whether a shift changed anything. It is done in
+// rendered form because that form is canonical for references: two spellings
+// that name the same cell must compare equal, or an edit would report changes
+// it did not make.
+func TestSameReferenceComparesWhatAReferenceNamesNotHowItWasWritten(t *testing.T) {
+	t.Parallel()
+	sheet, err := engine.Parse([]byte("1\t2\n=$A$1+1\t=A1+1\n"))
+	require.NoError(t, err)
+
+	edited := sheet.InsertCol(engine.Address{Col: 5})
+
+	// Unchanged means untouched: the formula keeps the author's spacing rather
+	// than being re-rendered into canonical form, which is the visible payoff
+	// of comparing what a reference NAMES instead of how it was written.
+	assert.Equal(t, "=$A$1+1", edited.Source()[1][0], "a pinned reference past the edit is left as written")
+	assert.Equal(t, "=A1+1", edited.Source()[1][1], "and so is a relative one")
+}

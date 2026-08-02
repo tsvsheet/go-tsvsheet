@@ -1,8 +1,8 @@
 package engine
 
 // Domain types name the primitive quantities the sheet engine threads through
-// its free functions, so a coordinate, a cell value, and a numeric result are
-// never bare int/string/float64 at a call boundary.
+// its free functions, so a coordinate, a cell value, and a numeric result reach
+// a call boundary as themselves rather than as bare int/string/float64.
 type (
 	// rowIndex is a 0-based grid row.
 	rowIndex int

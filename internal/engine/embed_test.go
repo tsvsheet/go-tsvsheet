@@ -186,3 +186,43 @@ func TestComputeWith_ThreadsTick(t *testing.T) {
 	assert.Equal(t, "7", g[0][0])
 	assert.Equal(t, "7", g[0][1])
 }
+
+// TestPassComputerKeepsASheetPassAndABareExpressionFromDiverging pins the
+// single-environment rule. ComputeWith and Expr.Eval route through the same
+// constructor precisely so a value computed in a grid and the same expression
+// evaluated on its own cannot disagree — two evaluators would drift, and the
+// drift would show up as a cell that changes meaning depending on who asked.
+func TestPassComputerKeepsASheetPassAndABareExpressionFromDiverging(t *testing.T) {
+	t.Parallel()
+	const expression = "round(2/3, 4) & \"|\" & (1+2)*3"
+	sheet, err := engine.Parse([]byte("=" + expression + "\n"))
+	require.NoError(t, err)
+	expr, err := engine.CompileExpr([]byte(expression))
+	require.NoError(t, err)
+
+	inGrid := sheet.Compute()[0][0]
+	alone := expr.Eval(engine.Grid{{""}}, engine.ComputeOptions{})
+
+	assert.Equal(t, inGrid, alone.String(), "the same text means the same thing either way")
+}
+
+// TestNewEmbedComputerKeepsAChildSheetUnderTheParentCeiling pins inheritance of
+// the resource limits. A sub-sheet that allocated against its own fresh ceiling
+// would make the parent's limit advisory — embed deeply enough and the ceiling
+// stops existing, which is exactly the shape of an untrusted-input exhaustion.
+func TestNewEmbedComputerKeepsAChildSheetUnderTheParentCeiling(t *testing.T) {
+	t.Parallel()
+	sheet, err := engine.Parse([]byte("=sheet(\"child\")\n"))
+	require.NoError(t, err)
+
+	tight := engine.Limits{GridDim: 8, ResultCells: 4, ResultBytes: 64}
+	computed := sheet.ComputeWith(engine.ComputeOptions{
+		Limits: tight,
+		Loader: memLoader(map[string]string{"child": "=sequence(1000,1000)\n"}),
+		Base:   "root",
+	})
+
+	assert.NotEqual(t, "", computed[0][0], "the child computes")
+	assert.Contains(t, []string{"#NUM!", "#VALUE!", "#REF!", "#IMPORT!"}, computed[0][0],
+		"and is refused by the parent's ceiling rather than allocating against its own")
+}

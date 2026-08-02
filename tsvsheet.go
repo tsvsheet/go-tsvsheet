@@ -30,8 +30,8 @@ type ComputeOptions = engine.ComputeOptions
 type Tick = engine.Tick
 
 // Diagnostic is an advisory finding about a sheet: an unknown function call in
-// a formula cell (which computes to #NAME?), or a view directive that cannot be
-// read. A cell finding carries Cell; a directive finding carries Line, since a
+// a formula cell (which computes to #NAME?), or a view directive the parser
+// rejects. A cell finding carries Cell; a directive finding carries Line, since a
 // directive occupies a physical line and no grid row.
 type Diagnostic = engine.Diagnostic
 

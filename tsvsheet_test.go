@@ -215,3 +215,44 @@ func TestExplainWith_MissingCell(t *testing.T) {
 	_, err = tsvsheet.ExplainWith(sheet, at, tsvsheet.ComputeOptions{})
 	require.Error(t, err)
 }
+
+// TestCheckReportsNoReferenceFindingsBecauseTheGrammarAdmitsNone pins why the
+// checker's job is as small as it is. Parse has already rejected a syntax
+// error, and the narrowed grammar admits only valid A1 forms, so there is no
+// such thing as a malformed reference left to report by the time Check runs —
+// a checker that pretended otherwise would be checking for a state its own
+// parser makes unreachable.
+func TestCheckReportsNoReferenceFindingsBecauseTheGrammarAdmitsNone(t *testing.T) {
+	t.Parallel()
+	_, err := tsvsheet.Parse([]byte("=A@1+1\n"))
+	require.Error(t, err, "a malformed reference never reaches Check; Parse refuses it")
+
+	sheet, err := tsvsheet.Parse([]byte("=A1+ZZ99\t=nosuchfn(1)\n"))
+	require.NoError(t, err)
+
+	diags := tsvsheet.Check(sheet)
+
+	require.Len(t, diags, 1, "only the unknown function is reported")
+	assert.Contains(t, diags[0].Message, "nosuchfn")
+	assert.Equal(t, "B1", diags[0].Cell)
+}
+
+// TestDiagnosticCarriesACellForAGridFindingAndALineForADirectiveOne pins the
+// two shapes a finding takes, and why: a directive occupies a physical line and
+// no grid row, so a cell address cannot locate it and a line number can.
+func TestDiagnosticCarriesACellForAGridFindingAndALineForADirectiveOne(t *testing.T) {
+	t.Parallel()
+	doc, err := tsvsheet.ParseDocument([]byte("#.hide\trows(3)\n=nosuchfn(1)\n"))
+	require.NoError(t, err)
+
+	_, directiveDiags := doc.View()
+	cellDiags := tsvsheet.Check(doc.Sheet())
+
+	require.NotEmpty(t, directiveDiags)
+	assert.Equal(t, 1, directiveDiags[0].Line, "a directive finding is located by line")
+	assert.Empty(t, directiveDiags[0].Cell)
+
+	require.NotEmpty(t, cellDiags)
+	assert.Equal(t, "A1", cellDiags[0].Cell, "a grid finding is located by cell")
+	assert.Zero(t, cellDiags[0].Line)
+}

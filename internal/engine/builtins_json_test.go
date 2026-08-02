@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/tsvsheet/go-tsvsheet/internal/engine"
 )
@@ -262,4 +263,36 @@ func TestJSON_SetErrors(t *testing.T) {
 			assert.Equal(t, string(tc.want), cellAt(t, g, 0, 1))
 		})
 	}
+}
+
+// TestSetPathLeavesTheInputDocumentUnmodified pins the immutability the doc
+// claims. A cell's text is shared by every formula that reads it, so a set that
+// mutated its input in place would change what the OTHER readers see — the
+// classic aliasing bug, and invisible until two formulas disagree about the
+// same cell.
+func TestSetPathLeavesTheInputDocumentUnmodified(t *testing.T) {
+	t.Parallel()
+	source := "{\"a\":1,\"b\":2}\t=jsonset(A1, \"a\", 9)\t=jsonget(A1, \"a\")\n"
+	sheet, err := engine.Parse([]byte(source))
+	require.NoError(t, err)
+	computed := sheet.Compute()[0]
+
+	assert.Contains(t, computed[1], "9", "the written copy carries the new value")
+	assert.Equal(t, "1", computed[2], "and the original still reads what it held")
+	assert.Equal(t, `{"a":1,"b":2}`, sheet.Source()[0][0], "the source cell is untouched")
+}
+
+// TestSetIndexRefusesToExtendAnArray pins the bound. Writing past the end
+// would silently grow the array and fill the gap with nulls, turning a typo in
+// an index into data.
+func TestSetIndexRefusesToExtendAnArray(t *testing.T) {
+	t.Parallel()
+	source := "[1,2]\t=jsonset(A1, \"[1]\", 9)\t=jsonset(A1, \"[2]\", 9)\t=jsonset(A1, \"[7]\", 9)\n"
+	sheet, err := engine.Parse([]byte(source))
+	require.NoError(t, err)
+	computed := sheet.Compute()[0]
+
+	assert.Contains(t, computed[1], "9", "an index inside the array writes")
+	assert.Equal(t, "#N/A", computed[2], "one past the last element does not extend it")
+	assert.Equal(t, "#N/A", computed[3], "nor does one far past it")
 }
