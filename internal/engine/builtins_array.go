@@ -52,7 +52,7 @@ func (r resolver) arraySequence(args []tsvt.Expr) Value {
 		return errorValue(ErrValue)
 	}
 	if r.comp.limits.tooManyCells(resultDim(rows), resultDim(cols)) {
-		return errorValue(ErrValue) // result exceeds the cell budget
+		return errorValue(ErrLimit) // result exceeds the cell budget
 	}
 	return arrayValue(sequenceMatrix(rows, cols))
 }
@@ -92,7 +92,10 @@ func (r resolver) arrayTranspose(args []tsvt.Expr) Value {
 	if len(args) != 1 {
 		return errorValue(ErrValue)
 	}
-	m := r.argMatrix(args[0])
+	m, refused := r.argMatrix(args[0])
+	if refused.isError() {
+		return refused
+	}
 	out := make([][]Value, len(m[0]))
 	for j := range out {
 		out[j] = make([]Value, len(m))
@@ -108,9 +111,13 @@ func (r resolver) arrayUnique(args []tsvt.Expr) Value {
 	if len(args) != 1 {
 		return errorValue(ErrValue)
 	}
+	m, refused := r.argMatrix(args[0])
+	if refused.isError() {
+		return refused
+	}
 	seen := make(map[string]boolResult)
 	var out [][]Value
-	for _, row := range r.argMatrix(args[0]) {
+	for _, row := range m {
 		if key := rowKey(row); !seen[key] {
 			seen[key] = true
 			out = append(out, row)
@@ -133,7 +140,11 @@ func (r resolver) arraySort(args []tsvt.Expr) Value {
 	if len(args) != 1 {
 		return errorValue(ErrValue)
 	}
-	out := append([][]Value(nil), r.argMatrix(args[0])...)
+	m, refused := r.argMatrix(args[0])
+	if refused.isError() {
+		return refused
+	}
+	out := append([][]Value(nil), m...)
 	sort.SliceStable(out, func(i, j int) bool { return lessValue(out[i][0], out[j][0]) })
 	return arrayValue(out)
 }
@@ -152,7 +163,15 @@ func (r resolver) arrayFilter(args []tsvt.Expr) Value {
 	if len(args) != 2 {
 		return errorValue(ErrValue)
 	}
-	out := filterRows(r.argMatrix(args[0]), flatten1D(r.argMatrix(args[1])))
+	rows, rowsRefused := r.argMatrix(args[0])
+	cond, condRefused := r.argMatrix(args[1])
+	if rowsRefused.isError() {
+		return rowsRefused
+	}
+	if condRefused.isError() {
+		return condRefused
+	}
+	out := filterRows(rows, flatten1D(cond))
 	if len(out) == 0 {
 		return errorValue(ErrNA)
 	}
@@ -179,7 +198,11 @@ func (r resolver) arrayFlatten(args []tsvt.Expr) Value {
 	if len(args) != 1 {
 		return errorValue(ErrValue)
 	}
-	cells := flatten1D(r.argMatrix(args[0]))
+	m, refused := r.argMatrix(args[0])
+	if refused.isError() {
+		return refused
+	}
+	cells := flatten1D(m)
 	out := make([][]Value, len(cells))
 	for i, v := range cells {
 		out[i] = []Value{v}

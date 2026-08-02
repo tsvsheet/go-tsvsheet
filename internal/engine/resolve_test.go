@@ -269,14 +269,6 @@ func TestCompute_ErrorPropagation(t *testing.T) {
 	assert.Equal(t, string(engine.ErrRef), formula1(t, "if(Z99, A1, C1)")) // condition
 }
 
-func TestCompute_ErrorLiteralPropagates(t *testing.T) {
-	t.Parallel()
-
-	// A cell literally holding an error value round-trips and propagates.
-	g := compute(t, "#REF!\t=A1 + 1\n")
-	assert.Equal(t, string(engine.ErrRef), cellAt(t, g, 0, 1))
-}
-
 func TestParse_SyntaxErrorNamesCell(t *testing.T) {
 	t.Parallel()
 

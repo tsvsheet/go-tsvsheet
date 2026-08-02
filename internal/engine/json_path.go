@@ -90,7 +90,12 @@ func walkPath(node jsonNode, steps []jsonStep) (jsonNode, bool) {
 // stepInto resolves one step against a node.
 func stepInto(node jsonNode, step jsonStep) (jsonNode, bool) {
 	if step.isIndex {
-		if node.kind != jsonArray || step.index >= len(node.arr) {
+		switch node.kind {
+		case jsonArray:
+		default:
+			return jsonNode{}, false
+		}
+		if step.index >= len(node.arr) {
 			return jsonNode{}, false
 		}
 		return node.arr[step.index], true
@@ -100,7 +105,9 @@ func stepInto(node jsonNode, step jsonStep) (jsonNode, bool) {
 
 // memberValue is the value of an object's member by key.
 func memberValue(node jsonNode, key textVal) (jsonNode, bool) {
-	if node.kind != jsonObject {
+	switch node.kind {
+	case jsonObject:
+	default:
 		return jsonNode{}, false
 	}
 	for _, m := range node.members {

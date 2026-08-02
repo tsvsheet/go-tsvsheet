@@ -158,7 +158,7 @@ func (r resolver) randArray(args []tsvt.Expr) Value {
 		return errorValue(ErrValue)
 	}
 	if r.comp.limits.tooManyCells(resultDim(rows), resultDim(cols)) {
-		return errorValue(ErrValue) // result exceeds the cell budget
+		return errorValue(ErrLimit) // result exceeds the cell budget
 	}
 	return arrayValue(r.randMatrix(rows, cols))
 }

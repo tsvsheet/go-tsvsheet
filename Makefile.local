@@ -14,7 +14,7 @@ VET_PKGS = $(shell go list ./... | grep -v /internal/grammar)
 # sibling checkout, no submodule. The parser is committed so ordinary builds stay
 # Docker-free; run this only to adopt a new grammar version by bumping GRAMMAR_REF
 # to a tsvsheet commit SHA (or tag, once the grammar repo publishes them).
-GRAMMAR_REF ?= 18cd2137bb05280666156ce7bdaa0b3175907469
+GRAMMAR_REF ?= 1f550a6e694f2b305c7ee307c07d3613f3e5b0e3
 .PHONY: grammars
 grammars: ## Regenerate internal/grammar from the pinned tsvsheet grammar (needs Docker)
 	GRAMMAR_REF=$(GRAMMAR_REF) ./scripts/regen-grammar.sh
@@ -31,3 +31,17 @@ wasm: ## Build the engine WebAssembly (tsvsheet.wasm + runtime) into dist/
 	GOOS=js GOARCH=wasm go build -ldflags="-s -w" -o $(DIST)/tsvsheet.wasm ./browser
 	echo '// @generated — Go runtime glue copied verbatim from GOROOT/lib/wasm/wasm_exec.js; regenerate with make wasm, never edit.' > $(DIST)/wasm_exec.js
 	cat "$$(go env GOROOT)/lib/wasm/wasm_exec.js" >> $(DIST)/wasm_exec.js
+
+# 32-bit portability: a public module has 32-bit consumers, and the addressable-
+# column bound (maxColumnMagnitude, internal/engine/address.go) deliberately
+# tightens to the platform int there — the 015 adversarial pass caught a
+# 64-bit-only untyped constant breaking exactly these builds while the default
+# matrix (all 64-bit) stayed green. The shared Makefile computes its check list
+# before this file is included, so the extra targets get their own static
+# pattern rule and hook into `portability` as added prerequisites.
+PORTABILITY_TARGETS_32 := linux/386 linux/arm
+PORTABILITY_CHECKS_32  := $(addprefix portability@,$(PORTABILITY_TARGETS_32))
+.PHONY: $(PORTABILITY_CHECKS_32)
+$(PORTABILITY_CHECKS_32): portability@%:
+	CGO_ENABLED=0 GOOS=$(firstword $(subst /, ,$*)) GOARCH=$(lastword $(subst /, ,$*)) go build ./...
+portability: $(PORTABILITY_CHECKS_32)

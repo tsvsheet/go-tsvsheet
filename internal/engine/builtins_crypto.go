@@ -180,7 +180,11 @@ func (r resolver) digestRange(args []tsvt.Expr) Value {
 		}
 		algo = named
 	}
-	msg, bad := canonicalTSV(r.argMatrix(args[0]))
+	m, refused := r.argMatrix(args[0])
+	if refused.isError() {
+		return refused
+	}
+	msg, bad := canonicalTSV(m)
 	if bad.isError() {
 		return bad
 	}
@@ -212,7 +216,11 @@ func (r resolver) verifyRange(args []tsvt.Expr) Value {
 	if keyBad.isError() {
 		return keyBad
 	}
-	msg, bad := canonicalTSV(r.argMatrix(args[2]))
+	m, refused := r.argMatrix(args[2])
+	if refused.isError() {
+		return refused
+	}
+	msg, bad := canonicalTSV(m)
 	if bad.isError() {
 		return bad
 	}

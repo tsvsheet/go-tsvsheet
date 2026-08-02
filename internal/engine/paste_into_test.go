@@ -1,7 +1,9 @@
 package engine_test
 
 import (
+	"math"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -235,4 +237,28 @@ func TestPasteTilesFillsAnExactlyDivisibleSpanOverOneCopy(t *testing.T) {
 
 	assert.Equal(t, []string{"a", "b", "a", "b"}, tiled.Source()[0], "the block repeats across the span")
 	assert.Equal(t, []string{"a", "b", "a", "b"}, tiled.Source()[1], "and down it")
+}
+
+// TestPasteIntoSpanAreaNeverWrapsOnMultiplication pins that the span-area
+// bound goes through the dimension-first tooManyCells, never the raw
+// rows*cols product: two dimensions near sqrt(MaxInt) multiply to a NEGATIVE
+// int, which passed the former comparison and authorised a 9-quintillion-cell
+// span under a 10-cell budget.
+func TestPasteIntoSpanAreaNeverWrapsOnMultiplication(t *testing.T) {
+	t.Parallel()
+
+	s := parse(t, "1\n")
+	limits := engine.Limits{ResultCells: 10, GridDim: math.MaxInt, ResultBytes: 100}
+	wide := span(0, 0, 3037000499, 3037000499) // 3037000500^2 wraps negative in int64
+	done := make(chan error, 1)
+	go func() {
+		_, err := s.PasteInto(wide, addr(0, 0), block([]string{"a"}), limits)
+		done <- err
+	}()
+	select {
+	case err := <-done:
+		assert.ErrorIs(t, err, constants.ErrInvalidValue)
+	case <-time.After(10 * time.Second):
+		t.Fatal("no refusal within 10s — the wrapped area authorised the span")
+	}
 }

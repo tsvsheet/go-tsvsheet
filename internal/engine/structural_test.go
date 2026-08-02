@@ -1,6 +1,7 @@
 package engine_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -189,4 +190,60 @@ func TestSameReferenceComparesWhatAReferenceNamesNotHowItWasWritten(t *testing.T
 	// of comparing what a reference NAMES instead of how it was written.
 	assert.Equal(t, "=$A$1+1", edited.Source()[1][0], "a pinned reference past the edit is left as written")
 	assert.Equal(t, "=A1+1", edited.Source()[1][1], "and so is a relative one")
+}
+
+// TestShiftPointAndShiftSpanCannotTouchAnUnaddressableColumn pins the rewrite rule for
+// a reference whose column letters exceed the addressable bound (lettersToIndex
+// refuses the run): no insert or delete at a real index can affect such a
+// column, so the formula text is left byte-for-byte as written — never
+// re-rendered through a wrapped index — and it computes as #REF! regardless.
+// The range case keeps the WHOLE reference verbatim even though its in-bounds
+// endpoint would otherwise shift: a reference that is already an error is not
+// half-rewritten.
+func TestShiftPointAndShiftSpanCannotTouchAnUnaddressableColumn(t *testing.T) {
+	t.Parallel()
+
+	huge := strings.Repeat("Z", 9)
+	src := "1\t=" + huge + "1\t=sum(A1:" + huge + "1)\n"
+	for name, edit := range map[string]func(engine.Sheet) engine.Sheet{
+		"insert col": func(s engine.Sheet) engine.Sheet { return s.InsertCol(addr(0, 0)) },
+		"delete col": func(s engine.Sheet) engine.Sheet { return s.DeleteCol(addr(0, 0)) },
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			got := edit(parse(t, src))
+			cells := got.Source()[0]
+			assert.Contains(t, cells, "="+huge+"1")
+			assert.Contains(t, cells, "=sum(A1:"+huge+"1)")
+		})
+	}
+}
+
+// TestShiftNeverMintsAnUnaddressableReference pins the output guard: EFWFSWHTP
+// is the LAST addressable column, so an insert that would shift a reference to
+// it one further must collapse the reference to #REF! — never render EFWFSWHTQ,
+// a spelling the library's own parser, resolver, and edit language all refuse.
+func TestShiftNeverMintsAnUnaddressableReference(t *testing.T) {
+	t.Parallel()
+
+	s := parse(t, "=EFWFSWHTP1\t=sum(A1:EFWFSWHTP1)\n")
+	got := s.InsertCol(addr(0, 0))
+
+	cells := got.Source()[0]
+	assert.Contains(t, cells, "=#REF!", "the point reference shifted past the bound collapses")
+	for _, cell := range cells {
+		assert.NotContains(t, cell, "EFWFSWHTQ", "no cell may hold the unparseable spelling")
+	}
+}
+
+// TestShiftToExactlyTheLastAddressableColumnIsRendered pins the TOP of the
+// axis bound from below: EFWFSWHTO shifts to EFWFSWHTP — the LAST addressable
+// column — and must be rendered, not collapsed. An off-by-one narrowing of
+// axis.inBounds (`<=` to `<`) collapses exactly this shift and nothing the
+// one-past tests can see.
+func TestShiftToExactlyTheLastAddressableColumnIsRendered(t *testing.T) {
+	t.Parallel()
+
+	got := parse(t, "=EFWFSWHTO1\n").InsertCol(addr(0, 0))
+	assert.Equal(t, "=EFWFSWHTP1", sourceAt(t, got, 0, 1))
 }

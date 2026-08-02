@@ -45,14 +45,23 @@ func bothText(left, right Value) bool {
 }
 
 // textual reports whether a value participates in string comparison.
-func textual(v Value) bool { return v.kind == kindString || v.kind == kindEmpty }
+func textual(v Value) bool {
+	switch v.kind {
+	case kindString, kindEmpty:
+		return true
+	default:
+		return false
+	}
+}
 
 // text is a value's comparable string form (empty for the empty value).
 func text(v Value) string {
-	if v.kind == kindString {
+	switch v.kind {
+	case kindString:
 		return v.str
+	default:
+		return ""
 	}
-	return ""
 }
 
 // numberOrder evaluates a comparison over two numbers.

@@ -129,8 +129,9 @@ func fnMid(args []Value) Value {
 type byteBudget int
 
 // repeatText repeats text a whole number of times (Excel REPT); a negative
-// count is #VALUE!, and a result exceeding the byte budget is #VALUE!. REPT
-// dispatches lazily (evalRept) so it can read the injected byte limit.
+// count is #VALUE!, and a result exceeding the byte budget is #LIMIT! — a
+// budget refusal, not a type error (SPECIFICATION §6). REPT dispatches lazily
+// (evalRept) so it can read the injected byte limit.
 func repeatText(args []Value, limit byteBudget) Value {
 	n, bad := intArg(args[1])
 	if bad.isError() {
@@ -141,7 +142,7 @@ func repeatText(args []Value, limit byteBudget) Value {
 	}
 	text := argText(args, 0)
 	if len(text) > 0 && int64(n)*int64(len(text)) > int64(limit) {
-		return errorValue(ErrValue) // result exceeds the byte budget
+		return errorValue(ErrLimit) // result exceeds the byte budget
 	}
 	return stringValue(textVal(strings.Repeat(text, int(n))))
 }
@@ -153,10 +154,12 @@ func fnExact(args []Value) Value {
 
 // fnT is the operand's text if it is text, else the empty string.
 func fnT(args []Value) Value {
-	if args[0].kind == kindString {
+	switch args[0].kind {
+	case kindString:
 		return args[0]
+	default:
+		return stringValue("")
 	}
-	return stringValue("")
 }
 
 // fnConcatenate joins the text forms of its operands (Excel CONCATENATE).
@@ -285,8 +288,10 @@ func fnCode(args []Value) Value {
 // fnValue parses text as a number; non-numeric text is #VALUE!.
 func fnValue(args []Value) Value {
 	v := value(textVal(strings.TrimSpace(argText(args, 0))))
-	if v.kind == kindNumber {
+	switch v.kind {
+	case kindNumber:
 		return v
+	default:
+		return errorValue(ErrValue)
 	}
-	return errorValue(ErrValue)
 }

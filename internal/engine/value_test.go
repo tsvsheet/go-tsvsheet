@@ -192,3 +192,56 @@ func TestTextInAColumnDoesNotBecomeANumericError(t *testing.T) {
 	assert.Equal(t, "2", computed[0], "two of the three cells are numbers")
 	assert.Equal(t, "3", computed[1], "and the third is a three-character word")
 }
+
+func TestCompute_ErrorLiteralPropagates(t *testing.T) {
+	t.Parallel()
+
+	// A cell literally holding an error value round-trips and propagates.
+	g := compute(t, "#REF!\t=A1 + 1\n")
+	assert.Equal(t, string(engine.ErrRef), cellAt(t, g, 0, 1))
+}
+
+// TestCompute_LimitLiteralPropagates pins #LIMIT! as a first-class error value:
+// a cell literally holding it round-trips as an error and propagates through a
+// formula, exactly like the other error codes — not as text turning into
+// #VALUE!.
+func TestCompute_LimitLiteralPropagates(t *testing.T) {
+	t.Parallel()
+
+	g := compute(t, "#LIMIT!\t=A1 + 1\n")
+	assert.Equal(t, string(engine.ErrLimit), cellAt(t, g, 0, 1))
+}
+
+// TestAsCellResultStripsTheRefusalMarkerAtTheCellBoundary pins that a cell
+// whose COMPUTED value is a propagated refusal behaves exactly like a stored
+// error literal once cached: A1's #LIMIT! came from a refused range, but a
+// range over A1 itself has resolved cells to step over, so countif counts 0
+// rather than propagating — the marker must not leak across the cell boundary
+// and poison hole-tolerant consumers of unrelated ranges.
+func TestAsCellResultStripsTheRefusalMarkerAtTheCellBoundary(t *testing.T) {
+	t.Parallel()
+
+	g := compute(t, "=sum(B1:B50000000000)\t=countif(A1:A1, \">0\")\n")
+	assert.Equal(t, string(engine.ErrLimit), cellAt(t, g, 0, 0))
+	assert.Equal(t, "0", cellAt(t, g, 0, 1))
+}
+
+// TestEveryErrorCodeIsAFormulaLiteral pins ERRORCONST parity with §6: each of
+// the eleven error values is admitted as a formula-expression literal and
+// evaluates to itself. #IMPORT! and #LIMIT! had drifted out of the lexer rule
+// — `=#IMPORT!` was a syntax error while §6 documented the code.
+func TestEveryErrorCodeIsAFormulaLiteral(t *testing.T) {
+	t.Parallel()
+
+	for _, code := range []engine.ErrorValue{
+		engine.ErrRef, engine.ErrValue, engine.ErrName, engine.ErrDiv,
+		engine.ErrCirc, engine.ErrNA, engine.ErrNum, engine.ErrNull,
+		engine.ErrSpill, engine.ErrImport, engine.ErrLimit,
+	} {
+		t.Run(string(code), func(t *testing.T) {
+			t.Parallel()
+			g := compute(t, "="+string(code)+"\n")
+			assert.Equal(t, string(code), cellAt(t, g, 0, 0))
+		})
+	}
+}

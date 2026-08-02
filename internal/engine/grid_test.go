@@ -2,6 +2,8 @@ package engine_test
 
 import (
 	"errors"
+	"io"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -187,4 +189,90 @@ func TestMaxLineBytesBoundsASingleScannedRow(t *testing.T) {
 	_, err := engine.Parse([]byte(strings.Repeat("a", 2<<20) + "\n"))
 
 	require.Error(t, err, "a line past the ceiling is refused, not allocated")
+}
+
+// TestScanLineNormalizesEveryLineTerminator pins the CR fix FuzzParseDocument
+// forced: LF, CRLF, and a lone CR each terminate a line, so no carriage return
+// can survive into cell text and break the canonical round-trip.
+func TestScanLineNormalizesEveryLineTerminator(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string][][]string{
+		"a\nb\n":   {{"a"}, {"b"}},
+		"a\r\nb\n": {{"a"}, {"b"}},
+		"a\rb\n":   {{"a"}, {"b"}},
+		"\r\r":     {{""}, {""}},
+		"a\r":      {{"a"}},
+	}
+	for src, want := range cases {
+		t.Run(strconv.Quote(src), func(t *testing.T) {
+			t.Parallel()
+			g, err := engine.ReadTSV(strings.NewReader(src))
+			require.NoError(t, err)
+			assert.Equal(t, engine.Grid(want), g)
+		})
+	}
+}
+
+// TestWriteTSVRefusesARowThatWouldReadBackAsAComment pins the round-trip
+// closure FuzzReadTSV forced: a document may legally hold `#!x` as data below
+// its comment lines, but the bare grid format has no escape for a leading
+// marker, so writing that row would emit a line the next read drops — data
+// loss dressed as output. WriteTSV refuses instead.
+func TestWriteTSVRefusesARowThatWouldReadBackAsAComment(t *testing.T) {
+	t.Parallel()
+
+	g, err := engine.ReadTSV(strings.NewReader("# \n#!x\n"))
+	require.NoError(t, err)
+	require.Equal(t, engine.Grid{{"#!x"}}, g, "below its comments, #!x is data")
+
+	var b strings.Builder
+	err = engine.WriteTSV(&b, g)
+	assert.ErrorIs(t, err, constants.ErrInvalidValue)
+	assert.Empty(t, b.String(), "nothing is written before the refusal")
+
+	for _, row := range []string{"#. d", "# legacy"} {
+		err := engine.WriteTSV(&strings.Builder{}, engine.Grid{{"x"}, {row}})
+		assert.ErrorIs(t, err, constants.ErrInvalidValue, row)
+	}
+	require.NoError(
+		t,
+		engine.WriteTSV(&strings.Builder{}, engine.Grid{{"#N/A", "#!not-first-cell"}}),
+		"markers away from column A are data",
+	)
+}
+
+// oneByteReader dribbles its content a single byte per Read, so a terminator
+// split across scanner refills is exercised the way a socket or pipe delivers
+// it.
+type oneByteReader struct{ rest []byte }
+
+func (r *oneByteReader) Read(p []byte) (int, error) {
+	if len(r.rest) == 0 {
+		return 0, io.EOF
+	}
+	p[0] = r.rest[0]
+	r.rest = r.rest[1:]
+	return 1, nil
+}
+
+// TestCrLineHoldsASplitCRLFAcrossReads pins crLine's wait-for-one-more-byte
+// branch: with a CR as the last buffered byte mid-stream, the scanner must ask
+// for the next byte to tell a lone CR from a split CRLF, or every CRLF whose
+// halves land in different reads would mint a phantom empty row. Every test
+// reader elsewhere delivers its whole content in one read, so only a dribbling
+// reader can reach this branch.
+func TestCrLineHoldsASplitCRLFAcrossReads(t *testing.T) {
+	t.Parallel()
+
+	for _, src := range []string{"a\r\nb\n", "a\r\n", "x\r\ny\r\nz\n", "\r\n\r\n", "a\rb\n", "a\r"} {
+		t.Run(strconv.Quote(src), func(t *testing.T) {
+			t.Parallel()
+			whole, err := engine.ReadTSV(strings.NewReader(src))
+			require.NoError(t, err)
+			dribbled, err := engine.ReadTSV(&oneByteReader{rest: []byte(src)})
+			require.NoError(t, err)
+			assert.Equal(t, whole, dribbled, "streamed and whole-buffer reads must agree")
+		})
+	}
 }

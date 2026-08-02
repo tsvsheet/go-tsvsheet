@@ -55,7 +55,11 @@ func (r resolver) seriesCall(fn seriesSpec, args []tsvt.Expr) Value {
 		}
 		span = s
 	}
-	nums, bad := seriesNumbers(flatten1D(r.argMatrix(args[0])))
+	m, refused := r.argMatrix(args[0])
+	if refused.isError() {
+		return refused
+	}
+	nums, bad := seriesNumbers(flatten1D(m))
 	if bad.isError() {
 		return bad
 	}
@@ -91,8 +95,10 @@ func (r resolver) spanArg(arg tsvt.Expr) (windowSpan, Value) {
 func seriesNumbers(cells []Value) ([]float64, Value) {
 	nums := make([]float64, len(cells))
 	for i, cell := range cells {
-		if cell.kind == kindEmpty {
+		switch cell.kind {
+		case kindEmpty:
 			return nil, errorValue(ErrValue)
+		default:
 		}
 		n, bad := cell.asNumber()
 		if bad.isError() {

@@ -77,9 +77,12 @@ func spanBounds(span Span, origin Address, limits Limits) error {
 	if span.To.Row >= limits.GridDim || span.To.Col >= limits.GridDim {
 		return constants.ErrInvalidValue.With(nil, "paste exceeds the grid limit", span.To.String())
 	}
-	rows := span.To.Row - span.From.Row + 1
-	cols := span.To.Col - span.From.Col + 1
-	if rows*cols > limits.ResultCells {
+	// Dimension-first via tooManyCells, never the raw product: two large
+	// dimensions multiply past the int ceiling and wrap negative, passing the
+	// comparison — the exact trap overCellBudget's comment documents.
+	rows := resultDim(span.To.Row - span.From.Row + 1)
+	cols := resultDim(span.To.Col - span.From.Col + 1)
+	if limits.tooManyCells(rows, cols) {
 		return constants.ErrInvalidValue.With(nil, "paste span exceeds the cell limit", span.To.String())
 	}
 	return nil

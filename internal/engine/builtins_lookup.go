@@ -47,7 +47,10 @@ func (r resolver) tableDim(args []tsvt.Expr, isRows boolResult) Value {
 	if len(args) != 1 {
 		return errorValue(ErrValue)
 	}
-	m := r.argMatrix(args[0])
+	m, refused := r.argMatrix(args[0])
+	if refused.isError() {
+		return refused
+	}
 	if isRows {
 		return numberValue(floatVal(len(m)))
 	}
@@ -59,22 +62,32 @@ func (r resolver) tableIndex(args []tsvt.Expr) Value {
 	if len(args) < 2 || len(args) > 3 {
 		return errorValue(ErrValue)
 	}
-	m := r.argMatrix(args[0])
-	row, bad := r.indexArg(args[1])
+	m, refused := r.argMatrix(args[0])
+	if refused.isError() {
+		return refused
+	}
+	row, col, bad := r.tableIndexArgs(args)
 	if bad.isError() {
 		return bad
-	}
-	col := charPos(1)
-	if len(args) == 3 {
-		col, bad = r.indexArg(args[2])
-		if bad.isError() {
-			return bad
-		}
 	}
 	if !withinMatrix(m, row, col) {
 		return errorValue(ErrRef)
 	}
 	return m[row-1][col-1]
+}
+
+// tableIndexArgs reads INDEX's row argument and its optional column argument
+// (defaulting to 1); an error in either propagates.
+func (r resolver) tableIndexArgs(args []tsvt.Expr) (row, col charPos, bad Value) {
+	row, bad = r.indexArg(args[1])
+	if bad.isError() {
+		return 0, 0, bad
+	}
+	col = charPos(1)
+	if len(args) == 3 {
+		col, bad = r.indexArg(args[2])
+	}
+	return row, col, bad
 }
 
 // withinMatrix reports whether (row, col) is a 1-based cell of m.
@@ -89,7 +102,11 @@ func (r resolver) tableMatch(args []tsvt.Expr) Value {
 		return errorValue(ErrValue)
 	}
 	key := r.eval(args[0])
-	for i, cell := range flatten1D(r.argMatrix(args[1])) {
+	m, refused := r.argMatrix(args[1])
+	if refused.isError() {
+		return refused
+	}
+	for i, cell := range flatten1D(m) {
 		if equalValues(key, cell) {
 			return numberValue(floatVal(i + 1))
 		}
@@ -113,7 +130,10 @@ func (r resolver) tableLookup(args []tsvt.Expr, isVertical boolResult) Value {
 		return errorValue(ErrValue)
 	}
 	key := r.eval(args[0])
-	m := r.argMatrix(args[1])
+	m, refused := r.argMatrix(args[1])
+	if refused.isError() {
+		return refused
+	}
 	idx, bad := r.indexArg(args[2])
 	if bad.isError() {
 		return bad

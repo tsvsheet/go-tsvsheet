@@ -164,7 +164,9 @@ func fnJSONKeys(args []Value) Value {
 	if !found {
 		return errorValue(ErrNA)
 	}
-	if at.kind != jsonObject {
+	switch at.kind {
+	case jsonObject:
+	default:
 		return errorValue(ErrValue)
 	}
 	if len(at.members) == 0 {
@@ -234,7 +236,12 @@ func setPath(node jsonNode, steps []jsonStep, value jsonNode) (jsonNode, Value) 
 // the last element is #N/A (indices never extend an array).
 func setIndex(node jsonNode, steps []jsonStep, value jsonNode) (jsonNode, Value) {
 	i := steps[0].index
-	if node.kind != jsonArray || i >= len(node.arr) {
+	switch node.kind {
+	case jsonArray:
+	default:
+		return jsonNode{}, errorValue(ErrNA)
+	}
+	if i >= len(node.arr) {
 		return jsonNode{}, errorValue(ErrNA)
 	}
 	child, bad := setPath(node.arr[i], steps[1:], value)
@@ -249,7 +256,9 @@ func setIndex(node jsonNode, steps []jsonStep, value jsonNode) (jsonNode, Value)
 // setKey writes through an object key, materializing a missing key as an
 // appended empty object; keying into a non-object is #N/A.
 func setKey(node jsonNode, steps []jsonStep, value jsonNode) (jsonNode, Value) {
-	if node.kind != jsonObject {
+	switch node.kind {
+	case jsonObject:
+	default:
 		return jsonNode{}, errorValue(ErrNA)
 	}
 	members := append([]jsonMember(nil), node.members...)

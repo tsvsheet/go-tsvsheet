@@ -37,13 +37,14 @@ func buildItem(ctx grammar.IItemContext, axis Axis) (Item, error) {
 // mistake than an intent: a directive that declares nothing is written by
 // omitting the line.
 func buildCount(ctx grammar.ICountCallContext) (Item, error) {
-	if name := funcName(ctx.NAME().GetText()); name != fnCount {
-		if name == fnRange {
-			// `range(40)` has a count's shape; say which spelling was meant.
-			n := ctx.Offset().GetText()
-			return Item{}, constants.ErrInvalidValue.With(nil, "item", ctx.GetText(),
-				"hint", "a range takes colon spans: range("+n+":"+n+")")
-		}
+	switch name := funcName(ctx.NAME().GetText()); name {
+	case fnCount:
+	case fnRange:
+		// `range(40)` has a count's shape; say which spelling was meant.
+		n := ctx.Offset().GetText()
+		return Item{}, constants.ErrInvalidValue.With(nil, "item", ctx.GetText(),
+			"hint", "a range takes colon spans: range("+n+":"+n+")")
+	default:
 		return Item{}, unknownItem(name)
 	}
 	n, err := offsetOf(ctx.Offset())
@@ -56,7 +57,9 @@ func buildCount(ctx grammar.ICountCallContext) (Item, error) {
 // buildRange converts `range(a:b, …)`, validating every span against the axis
 // and for direction.
 func buildRange(ctx grammar.IRangeCallContext, axis Axis) (Item, error) {
-	if name := funcName(ctx.NAME().GetText()); name != fnRange {
+	switch name := funcName(ctx.NAME().GetText()); name {
+	case fnRange:
+	default:
 		return Item{}, unknownItem(name)
 	}
 	parsed := ctx.AllSpan()

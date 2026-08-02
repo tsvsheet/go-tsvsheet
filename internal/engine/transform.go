@@ -10,11 +10,27 @@ type (
 	lineIndex int
 	// axis reads and writes a CellRef's coordinate on one dimension as a 0-based
 	// lineIndex, so the row and column structural edits share one implementation.
+	// get's ok is false when the coordinate is past the addressable bound
+	// (a column-letter run lettersToIndex refuses): no structural edit at a real
+	// index can affect such a reference, so the caller leaves it verbatim.
+	// max is the largest lineIndex set can faithfully render: a SHIFTED
+	// coordinate past it collapses to #REF! rather than minting a reference the
+	// rest of the library refuses to parse.
 	axis struct {
-		get func(tsvt.CellRef) lineIndex
+		get func(tsvt.CellRef) (lineIndex, boolResult)
 		set func(tsvt.CellRef, lineIndex) tsvt.CellRef
+		max lineIndex
 	}
 )
+
+// inBounds reports whether a shifted coordinate is still renderable on this
+// axis: non-negative and within the axis's addressable bound. No current
+// transform can deliver a negative (deletion's -1 is intercepted by the
+// lo>hi collapse first); the check is a seam guard for transforms yet to be
+// written, not a reachable branch.
+func (a axis) inBounds(i lineIndex) boolResult {
+	return i >= 0 && i <= a.max
+}
 
 // transform shifts reference coordinates for one structural edit: point maps a
 // single-cell reference (ok=false when it was deleted), and lo/hi map a range's

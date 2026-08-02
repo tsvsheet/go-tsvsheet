@@ -2,7 +2,9 @@ package engine_test
 
 import (
 	"errors"
+	"math"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -20,41 +22,6 @@ func paste(t *testing.T, s engine.Sheet, at, origin engine.Address, b engine.Gri
 	got, err := s.Paste(at, origin, b, engine.DefaultLimits())
 	require.NoError(t, err)
 	return got
-}
-
-func TestParseBlock_SplitsRowsAndCells(t *testing.T) {
-	t.Parallel()
-
-	assert.Equal(t, block([]string{"a", "b"}, []string{"c"}), engine.ParseBlock("a\tb\nc"))
-}
-
-func TestParseBlock_NormalizesLineEndingsAndTrailingNewline(t *testing.T) {
-	t.Parallel()
-
-	// CRLF and lone CR both split rows (the Windows and legacy-Mac clipboard
-	// forms); exactly one trailing newline is ignored, so a second one is a
-	// genuine empty row.
-	assert.Equal(t, block([]string{"a"}, []string{"b"}), engine.ParseBlock("a\r\nb\r\n"))
-	assert.Equal(t, block([]string{"a"}, []string{"b"}), engine.ParseBlock("a\rb"))
-	assert.Equal(t, block([]string{"a"}, []string{""}), engine.ParseBlock("a\n\n"))
-}
-
-func TestParseBlock_EmptyTextIsASingleEmptyCell(t *testing.T) {
-	t.Parallel()
-
-	// The TSV serialization of one empty cell IS the empty string, so the
-	// decode is its inverse — which is what lets a paste clear a single cell.
-	assert.Equal(t, block([]string{""}), engine.ParseBlock(""))
-	assert.Equal(t, block([]string{""}), engine.ParseBlock("\n"))
-}
-
-func TestParseBlock_EveryLineIsData(t *testing.T) {
-	t.Parallel()
-
-	// A clipboard block has no comment or directive semantics: a `#.` line and
-	// a `# ` line are cell data, where a .tsvt parse would skip them.
-	got := engine.ParseBlock("#. note\n# legacy\n#N/A")
-	assert.Equal(t, block([]string{"#. note"}, []string{"# legacy"}, []string{"#N/A"}), got)
 }
 
 func TestPaste_RebasesUnpinnedReferencesByTheDelta(t *testing.T) {
@@ -291,4 +258,31 @@ func TestPaddedLeavesNoStaleDataUnderAPastedRectangle(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, "", pasted.Source()[1][1], "the short row's gap is cleared, not left holding old")
+}
+
+// TestPasteBoundsNeverWrapsOnAnUntrustedRow pins that a row at Atoi's ceiling
+// cannot wrap `at.Row+len(block)` negative and slip past GridDim: the bound is
+// subtraction-shaped, refusing immediately, never after allocation. The call
+// runs under a deadline so a regression FAILS with a diagnosis instead of
+// allocating until the runner dies.
+func TestPasteBoundsNeverWrapsOnAnUntrustedRow(t *testing.T) {
+	t.Parallel()
+
+	s := parse(t, "x\n")
+	done := make(chan error, 1)
+	go func() {
+		_, err := s.Paste(
+			addr(math.MaxInt-1, 0),
+			addr(0, 0),
+			block([]string{"a"}, []string{"b"}),
+			engine.DefaultLimits(),
+		)
+		done <- err
+	}()
+	select {
+	case err := <-done:
+		assert.ErrorIs(t, err, constants.ErrInvalidValue)
+	case <-time.After(10 * time.Second):
+		t.Fatal("no refusal within 10s — the wrapped bound authorised the paste")
+	}
 }

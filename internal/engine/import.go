@@ -173,7 +173,9 @@ func parseImport(body []byte, received, media MediaType, limits Limits) Value {
 // (ragged rows tolerated here — shapeImport enforces rectangularity), anything
 // else via the engine's TSV reader (ADR 0010 §3).
 func readImport(body []byte, received MediaType) (Grid, error) {
-	if received != mediaCSV {
+	switch received {
+	case mediaCSV:
+	default:
 		return ReadTSV(bytes.NewReader(body))
 	}
 	reader := csv.NewReader(bytes.NewReader(body))

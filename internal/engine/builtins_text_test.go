@@ -57,14 +57,14 @@ func TestText_ErrorsAndEdges(t *testing.T) {
 
 	v := string(engine.ErrValue)
 	cases := map[string]string{
-		`find("x", "hello")`:            v, // not found
-		`find("l", "hi", 5)`:            v, // start past end
-		`find("l", "hello", 0)`:         v, // start below 1
-		`left("hi", -1)`:                v, // negative count
-		`mid("hi", 0, 1)`:               v, // start below 1
-		`mid("hi", 1, -1)`:              v, // negative length
-		`rept("a", -1)`:                 v, // negative count
-		`rept("ab", 2000000)`:           v, // result (4 MB) exceeds the byte budget (OOM guard)
+		`find("x", "hello")`:            v,         // not found
+		`find("l", "hi", 5)`:            v,         // start past end
+		`find("l", "hello", 0)`:         v,         // start below 1
+		`left("hi", -1)`:                v,         // negative count
+		`mid("hi", 0, 1)`:               v,         // start below 1
+		`mid("hi", 1, -1)`:              v,         // negative length
+		`rept("a", -1)`:                 v,         // negative count
+		`rept("ab", 2000000)`:           "#LIMIT!", // result (4 MB) exceeds the byte budget (OOM guard, §6)
 		`replace("hi", 0, 1, "x")`:      v,
 		`char(0)`:                       v,                    // code below 1
 		`code("")`:                      v,                    // empty text

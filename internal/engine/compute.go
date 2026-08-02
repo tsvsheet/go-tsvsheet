@@ -57,9 +57,11 @@ func outputExtent(values [][]Value) dims {
 	for r := range values {
 		cols = max(cols, len(values[r]))
 		for c := range values[r] {
-			if a := values[r][c]; a.kind == kindArray {
+			switch a := values[r][c]; a.kind {
+			case kindArray:
 				rows = max(rows, r+len(a.arr))
 				cols = max(cols, c+len(a.arr[0]))
+			default:
 			}
 		}
 	}

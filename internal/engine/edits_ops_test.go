@@ -52,6 +52,8 @@ func TestParseEditsRejections(t *testing.T) {
 		"insertRow negative":    {src: "insertRow\t-1\n", want: constants.ErrEditsAddress},
 		"insertCol digits":      {src: "insertCol\t5\n", want: constants.ErrEditsAddress},
 		"insertCol lowercase":   {src: "insertCol\tc\n", want: constants.ErrEditsAddress},
+		"insertCol overflow":    {src: "insertCol\tZZZZZZZZZ\n", want: constants.ErrEditsAddress},
+		"setCell overflow col":  {src: "setCell\tZZZZZZZZZ1\t5\n", want: constants.ErrEditsAddress},
 		"insertCol no args":     {src: "insertCol\n", want: constants.ErrEditsArity},
 		"fill bad span":         {src: "fill\tB2\tnope\n", want: constants.ErrEditsAddress},
 		"fill reversed colon":   {src: "fill\tB2\tB3:\n", want: constants.ErrEditsAddress},
@@ -237,4 +239,46 @@ func TestEditArityRefusesAnOpWithTheWrongFieldCount(t *testing.T) {
 
 	assert.Error(t, tooMany, "an extra field is a mistake, not a courtesy")
 	assert.Error(t, tooFew)
+}
+
+// TestApplyFillRefusesASpanAreaOverTheCellBudget pins that one fill line cannot
+// drive the materialization its span names: withinGrid's corner check alone
+// authorised an 18-billion-cell rectangle from two small corners (both under
+// GridDim), and Sheet.Fill then allocated it — the same defect class the span
+// budget closes for formulas, at the edit choke point. The area answers to
+// ResultCells, the write budget Paste's block bound already uses.
+func TestApplyFillRefusesASpanAreaOverTheCellBudget(t *testing.T) {
+	t.Parallel()
+
+	tiny := engine.Limits{ResultCells: 5, GridDim: 10_000, ResultBytes: 100}
+	doc := parseDoc(t, "x\n")
+
+	// 3×2 = 6 cells > 5: refused, document untouched.
+	_, err := engine.Apply(doc, parseEdits(t, "fill\tA1\tA2:B4\n"), tiny)
+	require.Error(t, err)
+	assert.ErrorIs(t, err, constants.ErrInvalidValue)
+
+	// 5 cells exactly: authorised — the source x is copied into all five rows.
+	got, err := engine.Apply(doc, parseEdits(t, "fill\tA1\tA2:A6\n"), tiny)
+	require.NoError(t, err)
+	assert.Equal(t, "x\nx\nx\nx\nx\nx\n", string(got.Text()))
+
+	// The adversary's reproducer: both corners under GridDim, 18.3e9 cells.
+	// Refused from the corners alone under DefaultLimits — this line OOM-killed
+	// the process before the area check existed.
+	_, err = engine.Apply(doc, parseEdits(t, "fill\tA1\tA1:ZZZ999999\n"), engine.DefaultLimits())
+	require.Error(t, err)
+	assert.ErrorIs(t, err, constants.ErrInvalidValue)
+}
+
+// TestApplyPasteRefusesAnUntrustedRowThatWouldWrapTheGridBound pins the
+// 39-byte wire reproducer: a paste op at row 9223372036854775807 wrapped the
+// former additive GridDim check negative and grew the grid without ceiling.
+func TestApplyPasteRefusesAnUntrustedRowThatWouldWrapTheGridBound(t *testing.T) {
+	t.Parallel()
+
+	doc := parseDoc(t, "x\n")
+	edits := parseEdits(t, "paste\tA9223372036854775807\tA1\tYQpiCg==\n")
+	_, err := engine.Apply(doc, edits, engine.DefaultLimits())
+	assert.ErrorIs(t, err, constants.ErrInvalidValue)
 }

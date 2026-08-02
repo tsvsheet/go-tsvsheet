@@ -33,7 +33,9 @@ func normalized(sp Span) Span {
 // is skipped, so a span containing the source fills around it. Targets beyond
 // the grid grow it, as Set does. A negative from or span corner is a no-op,
 // mirroring the structural quartet; a from beyond the grid is an empty source
-// and clears its targets.
+// and clears its targets. Fill takes no Limits: it is a trusted-caller
+// surface, and the untrusted boundary — the edit language — bounds the span's
+// corners and area before delegating here (withinGrid in edits_ops.go).
 func (s Sheet) Fill(from Address, to Span) Sheet {
 	span := normalized(to)
 	if from.Row < 0 || from.Col < 0 || span.From.Row < 0 || span.From.Col < 0 {
@@ -123,13 +125,18 @@ func rebasedRow(c tsvt.CellRef, d offset) (int, boolResult) {
 }
 
 // rebasedCol is the cell's column letters after the shift — unchanged when
-// pinned.
+// pinned. ok is false when the shifted column leaves the addressable space on
+// either side: before column A, or past the bound lettersToIndex refuses.
 func rebasedCol(c tsvt.CellRef, d offset) (string, boolResult) {
 	if c.IsColAbsolute {
 		return c.Col, true
 	}
-	idx := lettersToIndex(columnLetters(c.Col)) + d.cols
-	if idx < 0 {
+	col, ok := lettersToIndex(columnLetters(c.Col))
+	if !ok {
+		return c.Col, false
+	}
+	idx := col + d.cols
+	if idx < 0 || int64(idx) >= maxColumnMagnitude {
 		return c.Col, false
 	}
 	return indexToLetters(colIndex(idx)), true

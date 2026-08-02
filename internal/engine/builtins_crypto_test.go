@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/ed25519"
 	"encoding/hex"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -181,4 +182,17 @@ func TestDecodedTextRefusesBytesThatAreNotText(t *testing.T) {
 
 	assert.Equal(t, "#VALUE!", computed[1], "decoded bytes that are not text are refused")
 	assert.Equal(t, "hi", computed[2], "while decoded text arrives as text")
+}
+
+// TestDigestAndVerifyPropagateARefusedRange pins refusal propagation for the
+// canonical-serialization consumers: without it DIGEST would hash a 1×1
+// stand-in and answer a plausible digest of data that was never read, and
+// VERIFY would judge a signature against the same phantom serialization.
+func TestDigestAndVerifyPropagateARefusedRange(t *testing.T) {
+	t.Parallel()
+
+	sig := strings.Repeat("00", 64)
+	key := strings.Repeat("00", 32)
+	assert.Equal(t, string(engine.ErrLimit), formula1(t, "digest(A1:A50000000000)"))
+	assert.Equal(t, string(engine.ErrLimit), formula1(t, `verify("`+sig+`", "`+key+`", A1:A50000000000)`))
 }

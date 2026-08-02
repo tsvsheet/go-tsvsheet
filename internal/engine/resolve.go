@@ -76,7 +76,7 @@ func (c computer) read(row rowIndex, col colIndex) Value {
 		return errorValue(ErrCirc)
 	}
 	c.phase[row][col] = phaseVisiting
-	result := c.evalCell(cl)
+	result := c.evalCell(cl).asCellResult()
 	c.cache[row][col] = result
 	c.phase[row][col] = phaseDone
 	return result
@@ -125,12 +125,16 @@ func (r resolver) resolveOperand(ref tsvt.Reference) cellset {
 	return r.resolveMatrix(rangeRef.From, *rangeRef.To)
 }
 
-// resolveSingle resolves a single-cell reference; an out-of-grid row (`A0`) is
-// #REF!, kept isSingle so it propagates through scalar().
+// resolveSingle resolves a single-cell reference; an unaddressable position
+// (`A0`, an over-bound column) is a wholesale #REF! refusal, kept isSingle so
+// it propagates through scalar() — and marked, so a lazy consumer reached
+// through a dispatcher branch (`countif(if(…, A0, …), …)`) propagates it
+// rather than stepping over an unresolved reference (pinned by the
+// dispatcher-branch cases in TestCriteria_RefusedRangePropagates).
 func (r resolver) resolveSingle(cell tsvt.CellRef) cellset {
 	at, ok := a1Address(cell)
 	if !ok {
-		return cellset{values: []Value{errorValue(ErrRef)}, isSingle: true}
+		return cellset{values: []Value{refusalValue(ErrRef)}, isSingle: true}
 	}
 	return cellset{values: []Value{r.comp.read(rowIndex(at.Row), colIndex(at.Col))}, isSingle: true}
 }
@@ -143,9 +147,23 @@ func (r resolver) resolveMatrix(from, to tsvt.CellRef) cellset {
 	a, aok := a1Address(from)
 	b, bok := a1Address(to)
 	if !aok || !bok {
-		return cellset{values: []Value{errorValue(ErrRef)}}
+		return cellset{values: []Value{refusalValue(ErrRef)}}
+	}
+	if r.overBudget(a, b) {
+		return cellset{values: []Value{refusalValue(ErrLimit)}}
 	}
 	return cellset{values: r.hull(a, b), isSingle: boolResult(a == b)}
+}
+
+// overBudget reports whether the inclusive rectangle spanned by a and b holds
+// more cells than the pass's span budget. It is checked from the corners alone
+// — before any allocation or read — so a written reference can never drive the
+// materialization it names; the refusal reuses the same overflow-safe
+// dimension-first bound an array result answers to.
+func (r resolver) overBudget(a, b Address) boolResult {
+	r0, r1 := ordered(gridPos(a.Row), gridPos(b.Row))
+	c0, c1 := ordered(gridPos(a.Col), gridPos(b.Col))
+	return boolResult(r.comp.limits.spanTooLarge(resultDim(r1-r0+1), resultDim(c1-c0+1)))
 }
 
 // hull reads every cell in the inclusive rectangle spanned by a and b.
@@ -161,14 +179,33 @@ func (r resolver) hull(a, b Address) []Value {
 	return values
 }
 
+// rangeCorners resolves a local range's two corner addresses; a single-cell
+// reference is its own second corner. isAddressable is false when either corner is
+// unaddressable (a row below 1, or a column past the bound) — #REF! at the
+// caller.
+func rangeCorners(rangeRef tsvt.RangeRef) (from, to Address, isAddressable boolResult) {
+	from, fromOK := a1Address(rangeRef.From)
+	to, toOK := from, fromOK
+	if rangeRef.To != nil {
+		to, toOK = a1Address(*rangeRef.To)
+	}
+	return from, to, fromOK && toOK
+}
+
 // a1Address converts an A1 cell to a 0-based (row, col). ok is false for a row
-// below 1 (`A0`); the grammar admits only a column label followed by an integer
-// row, so no other shape reaches here.
+// below 1 (`A0`) and for a column-letter run past the addressable bound (no
+// grid can contain it, so it is out of every grid — #REF! at the caller); the
+// grammar admits only a column label followed by an integer row, so no other
+// shape reaches here.
 func a1Address(cell tsvt.CellRef) (Address, boolResult) {
 	if cell.Row < 1 {
 		return Address{}, false
 	}
-	return Address{Row: cell.Row - 1, Col: lettersToIndex(columnLetters(cell.Col))}, true
+	col, ok := lettersToIndex(columnLetters(cell.Col))
+	if !ok {
+		return Address{}, false
+	}
+	return Address{Row: cell.Row - 1, Col: col}, true
 }
 
 // ordered returns its two coordinates low-first.
@@ -183,16 +220,35 @@ func ordered(x, y gridPos) (gridPos, gridPos) {
 // rows×columns shape (for lookups), and an expression that evaluates to an
 // array contributes that shape — consumed exactly like a range, so
 // `index(sort(…), 2)` reads the sorted block (ADR 0004 §2 array-valued
-// arguments). Any other expression is a 1×1 block.
-func (r resolver) argMatrix(arg tsvt.Expr) [][]Value {
-	if ref, ok := arg.(tsvt.RefOperand); ok {
-		return r.rangeMatrix(ref.Ref)
+// arguments). Any other expression is a 1×1 block. refused is the wholesale
+// refusal to propagate when the range (or a nested consumer of one) could not
+// be resolved at all — returned out of band precisely so no caller can mistake
+// it for a block of one error cell and step over it.
+func (r resolver) argMatrix(arg tsvt.Expr) (block [][]Value, refused Value) {
+	if ref, isRef := arg.(tsvt.RefOperand); isRef {
+		m := r.rangeMatrix(ref.Ref)
+		if m[0][0].isRefusal() {
+			return nil, m[0][0]
+		}
+		return m, Value{}
 	}
+	return r.evalMatrix(arg)
+}
+
+// evalMatrix shapes a non-reference argument: an array keeps its shape, a
+// refusal propagated out of a nested call (sort over a refused range) stays a
+// refusal, anything else is a 1×1 block.
+func (r resolver) evalMatrix(arg tsvt.Expr) (block [][]Value, refused Value) {
 	v := r.eval(arg)
-	if v.kind == kindArray {
-		return v.arr
+	if v.isRefusal() {
+		return nil, v
 	}
-	return [][]Value{{v}}
+	switch v.kind {
+	case kindArray:
+		return v.arr, Value{}
+	default:
+		return [][]Value{{v}}, Value{}
+	}
 }
 
 // rangeMatrix resolves an A1 reference to its rows×columns of values; an
@@ -203,13 +259,12 @@ func (r resolver) rangeMatrix(ref tsvt.Reference) [][]Value {
 	if rangeRef.File != "" {
 		return r.foreignMatrix(rangeRef)
 	}
-	from, fromOK := a1Address(rangeRef.From)
-	to, toOK := from, fromOK
-	if rangeRef.To != nil {
-		to, toOK = a1Address(*rangeRef.To)
+	from, to, isAddressable := rangeCorners(rangeRef)
+	if !isAddressable {
+		return [][]Value{{refusalValue(ErrRef)}}
 	}
-	if !fromOK || !toOK {
-		return [][]Value{{errorValue(ErrRef)}}
+	if r.overBudget(from, to) {
+		return [][]Value{{refusalValue(ErrLimit)}}
 	}
 	r0, r1 := ordered(gridPos(from.Row), gridPos(to.Row))
 	c0, c1 := ordered(gridPos(from.Col), gridPos(to.Col))

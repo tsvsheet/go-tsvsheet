@@ -129,3 +129,11 @@ func TestCheck_KnowsAdoptedFamilies(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, engine.Check(s))
 }
+
+// TestSeriesPropagatesARefusedRange pins refusal propagation for the windowed
+// timeseries builtins: without it a refused range folds as one phantom cell.
+func TestSeriesPropagatesARefusedRange(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, string(engine.ErrLimit), formula1(t, "ema(A1:A50000000000, 2)"))
+}

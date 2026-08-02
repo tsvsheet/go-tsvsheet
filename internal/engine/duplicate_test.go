@@ -1,6 +1,7 @@
 package engine_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -112,4 +113,57 @@ func TestDocument_DuplicateColKeepsLayout(t *testing.T) {
 	got := doc.DuplicateCol(engine.Address{Row: 0, Col: 0})
 
 	assert.Equal(t, "# note\n=1*3\t=1 * 3\t9\n", string(got.Text()))
+}
+
+// TestDuplicateCol_UnaddressableColumnInRebaseIsRef pins the rebase rule for a
+// duplicated formula referencing a column past the addressable bound: the
+// duplicate must shift the reference right by one, and a column lettersToIndex
+// refuses cannot be shifted — the shifted coordinate leaves the addressable
+// space, the same refusal as shifting left of column A — so the duplicate holds
+// #REF!. The original cell's own reference is untouched by the rewrite (the
+// structural verbatim rule) and stays as written.
+func TestDuplicateCol_UnaddressableColumnInRebaseIsRef(t *testing.T) {
+	t.Parallel()
+
+	huge := strings.Repeat("Z", 9)
+	s := parse(t, "="+huge+"1\tx\n")
+	got := s.DuplicateCol(addr(0, 0))
+
+	assert.Equal(t, "="+huge+"1", sourceAt(t, got, 0, 0)) // original: verbatim
+	assert.Equal(t, "=#REF!", sourceAt(t, got, 0, 1))     // duplicate: unshiftable → #REF!
+}
+
+// TestDuplicateCol_NeverMintsAnUnaddressableReference pins the rebase output
+// guard from the other direction: duplicating the column shifts =EFWFSWHTP1
+// (the last addressable column) right by one in the copy, which must become
+// #REF! — never the unparseable EFWFSWHTQ1 the unguarded arithmetic rendered.
+func TestDuplicateCol_NeverMintsAnUnaddressableReference(t *testing.T) {
+	t.Parallel()
+
+	got := parse(t, "=EFWFSWHTP1\tx\n").DuplicateCol(addr(0, 0))
+
+	for _, row := range got.Source() {
+		for _, cell := range row {
+			assert.NotContains(t, cell, "EFWFSWHTQ")
+		}
+	}
+	assert.Equal(t, "=#REF!", sourceAt(t, got, 0, 1), "the duplicate's shifted reference collapses")
+}
+
+// TestDuplicateColToExactlyTheLastAddressableColumnIsRendered pins the top of
+// the rebase bound from below. A duplicated column's copy shifts its
+// references TWICE — once for the grid insert, once for the rebase — so
+// =EFWFSWHTN1 (two below the bound) lands exactly on =EFWFSWHTP1, the last
+// addressable column: rendered, not #REF!. An off-by-one in rebasedCol's
+// upper check (`>=` to `>`) reintroduces the minted unparseable spelling one
+// column later with a green gate; one column further (=EFWFSWHTO1, landing at
+// 2^40, over the bound) must still collapse.
+func TestDuplicateColToExactlyTheLastAddressableColumnIsRendered(t *testing.T) {
+	t.Parallel()
+
+	got := parse(t, "=EFWFSWHTN1\tx\n").DuplicateCol(addr(0, 0))
+	assert.Equal(t, "=EFWFSWHTP1", sourceAt(t, got, 0, 1))
+
+	over := parse(t, "=EFWFSWHTO1\tx\n").DuplicateCol(addr(0, 0))
+	assert.Equal(t, "=#REF!", sourceAt(t, over, 0, 1))
 }

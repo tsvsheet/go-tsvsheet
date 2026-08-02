@@ -37,7 +37,11 @@ func (r resolver) criteriaCount(args []tsvt.Expr) Value {
 	if len(args) != 2 {
 		return errorValue(ErrValue)
 	}
-	cells := flatten1D(r.argMatrix(args[0]))
+	m, refused := r.argMatrix(args[0])
+	if refused.isError() {
+		return refused
+	}
+	cells := flatten1D(m)
 	crit := r.eval(args[1])
 	count := 0
 	for _, cell := range cells {
@@ -48,16 +52,35 @@ func (r resolver) criteriaCount(args []tsvt.Expr) Value {
 	return numberValue(floatVal(count))
 }
 
+// criteriaRanges resolves a criteria call's cell range (args[0]) and optional
+// sum range (args[2], defaulting to the cell range), flattened row-major; a
+// wholesale refusal of either range propagates.
+func (r resolver) criteriaRanges(args []tsvt.Expr) (cells, sumCells []Value, refused Value) {
+	m, refused := r.argMatrix(args[0])
+	if refused.isError() {
+		return nil, nil, refused
+	}
+	cells = flatten1D(m)
+	sumCells = cells
+	if len(args) == 3 {
+		sm, sumRefused := r.argMatrix(args[2])
+		if sumRefused.isError() {
+			return nil, nil, sumRefused
+		}
+		sumCells = flatten1D(sm)
+	}
+	return cells, sumCells, Value{}
+}
+
 // criteriaSum implements SUMIF/AVERAGEIF(range, criterion, [sumRange]); when a
 // sum range is given the matching positions are summed there.
 func (r resolver) criteriaSum(args []tsvt.Expr, isAverage boolResult) Value {
 	if len(args) < 2 || len(args) > 3 {
 		return errorValue(ErrValue)
 	}
-	cells := flatten1D(r.argMatrix(args[0]))
-	sumCells := cells
-	if len(args) == 3 {
-		sumCells = flatten1D(r.argMatrix(args[2]))
+	cells, sumCells, refused := r.criteriaRanges(args)
+	if refused.isError() {
+		return refused
 	}
 	total, matched, bad := foldMatches(cells, sumCells, r.eval(args[1]))
 	if bad.isError() {

@@ -14,7 +14,8 @@ type ErrorValue string
 // function), #DIV/0! (division by zero), #CIRC! (a formula whose evaluation
 // depends on itself), #N/A (lookup miss / NA()), #NUM! (numeric domain), #NULL!
 // (empty range intersection), #SPILL! (blocked dynamic-array spill), #IMPORT!
-// (a content-typed import failed — disabled, denied, or a bad handshake).
+// (a content-typed import failed — disabled, denied, or a bad handshake),
+// #LIMIT! (a reference or result larger than the configured cell budget).
 const (
 	ErrRef    ErrorValue = "#REF!"
 	ErrValue  ErrorValue = "#VALUE!"
@@ -26,6 +27,7 @@ const (
 	ErrNull   ErrorValue = "#NULL!"
 	ErrSpill  ErrorValue = "#SPILL!"
 	ErrImport ErrorValue = "#IMPORT!"
+	ErrLimit  ErrorValue = "#LIMIT!"
 )
 
 // valueKind tags the inhabited value shapes plus empty.
@@ -43,12 +45,15 @@ const (
 
 // Value is an evaluated cell value: empty, number, string, boolean, date, error,
 // or a 2-D array (a dynamic-array result that spills, or reduces to its top-left
-// value in a scalar context).
+// value in a scalar context). isRefused marks a wholesale range-resolution
+// refusal (see refusalValue); it never survives past the cell that produced it
+// (read strips it via asCellResult).
 type Value struct {
-	str  string
-	arr  [][]Value
-	kind valueKind
-	num  float64
+	str       string
+	arr       [][]Value
+	kind      valueKind
+	num       float64
+	isRefused bool
 }
 
 // arrayValue wraps a non-empty rows×columns array result.
@@ -96,6 +101,31 @@ func dateValue(serial floatVal) Value { return Value{kind: kindDate, num: float6
 // errorValue wraps an error value.
 func errorValue(e ErrorValue) Value { return Value{kind: kindError, str: string(e)} }
 
+// refusalValue wraps an error value that stands for an ENTIRE failed range
+// resolution — an unaddressable corner, an over-budget span, an unresolvable
+// `"file"!` target — as opposed to an error held by one cell within a resolved
+// range. The distinction exists for the lazily-dispatched consumers: they may
+// step over per-cell errors by design (a lookup scans past a #REF! hole in a
+// ragged grid), but a wholesale refusal has no cells to step over, so every
+// consumer must propagate it — otherwise the refusal launders into a plausible
+// answer (a countif over a refused range answering 0).
+func refusalValue(e ErrorValue) Value {
+	return Value{kind: kindError, str: string(e), isRefused: true}
+}
+
+// isRefusal reports whether the value is a wholesale range-resolution refusal.
+func (v Value) isRefusal() bool { return v.isRefused }
+
+// asCellResult strips the wholesale-refusal marker: once a refusal has become a
+// cell's computed value it is an ordinary error cell — a range over THAT cell
+// has resolved cells to step over, exactly like a stored error literal — so the
+// marker must not leak across the cell boundary and poison hole-tolerant
+// consumers of unrelated ranges.
+func (v Value) asCellResult() Value {
+	v.isRefused = false
+	return v
+}
+
 // value parses a raw cell string into a Value: empty stays empty, a numeric
 // string becomes a number, a recognized error code round-trips as an error, and
 // anything else is a string.
@@ -124,7 +154,7 @@ func value(raw textVal) Value {
 // isErrorCode reports whether raw is one of the error values.
 func isErrorCode(raw textVal) bool {
 	switch ErrorValue(raw) {
-	case ErrRef, ErrValue, ErrName, ErrDiv, ErrCirc, ErrNA, ErrNum, ErrNull, ErrSpill, ErrImport:
+	case ErrRef, ErrValue, ErrName, ErrDiv, ErrCirc, ErrNA, ErrNum, ErrNull, ErrSpill, ErrImport, ErrLimit:
 		return true
 	default:
 		return false
