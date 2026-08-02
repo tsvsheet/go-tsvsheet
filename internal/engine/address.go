@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"math"
 	"strconv"
 	"strings"
 
@@ -31,7 +32,11 @@ func ParseAddress(s AddressText) (Address, error) {
 	if err != nil || row < 1 {
 		return Address{}, constants.ErrInvalidValue.With(nil, "address", string(s))
 	}
-	return Address{Row: row - 1, Col: lettersToIndex(columnLetters(letters))}, nil
+	col, ok := lettersToIndex(columnLetters(letters))
+	if !ok {
+		return Address{}, constants.ErrInvalidValue.With(nil, "address", string(s))
+	}
+	return Address{Row: row - 1, Col: col}, nil
 }
 
 // splitLetters splits a spreadsheet address into its leading uppercase-letter
@@ -56,14 +61,28 @@ func (a Address) String() string {
 	return indexToLetters(colIndex(a.Col)) + strconv.Itoa(a.Row+1)
 }
 
+// maxColumnMagnitude bounds the bijective base-26 value a column-letter run may
+// reach: maxSafeMagnitude, tightened to the platform's int ceiling on a 32-bit
+// target so the accumulator's final value always fits an int there too.
+const maxColumnMagnitude = min(maxSafeMagnitude, math.MaxInt)
+
 // lettersToIndex converts spreadsheet column letters to a 0-based index
-// (A→0, Z→25, AA→26), bijective base-26.
-func lettersToIndex(letters columnLetters) int {
-	index := 0
+// (A→0, Z→25, AA→26), bijective base-26. ok is false when the letter run's
+// value exceeds maxColumnMagnitude: the grammar admits arbitrarily long runs,
+// and an unguarded accumulation wraps into a nonsense index that downstream
+// allocation math would trust — the refusal has to happen at the conversion,
+// for the same reason boundedInt refuses at the float conversion. The
+// accumulator is 64-bit on every platform and the bound is checked after every
+// step, so it can never exceed 26·maxColumnMagnitude+26 — far below overflow.
+func lettersToIndex(letters columnLetters) (int, boolResult) {
+	var index int64
 	for i := 0; i < len(letters); i++ {
-		index = index*26 + int(letters[i]-'A') + 1
+		index = index*26 + int64(letters[i]-'A') + 1
+		if index > maxColumnMagnitude {
+			return 0, false
+		}
 	}
-	return index - 1
+	return int(index - 1), true
 }
 
 // indexToLetters converts a 0-based column index to spreadsheet letters.

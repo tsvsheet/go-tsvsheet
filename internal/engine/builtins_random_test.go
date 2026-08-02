@@ -98,7 +98,7 @@ func TestRandarray_Errors(t *testing.T) {
 		"negative cols":    {"randarray(1, -2)", "#VALUE!"},
 		"no arguments":     {"randarray()", "#VALUE!"},
 		"too many":         {"randarray(1, 2, 3)", "#VALUE!"},
-		"exceeds budget":   {"randarray(3000, 3000)", "#VALUE!"},
+		"exceeds budget":   {"randarray(3000, 3000)", "#LIMIT!"}, // budget refusals are #LIMIT! (§6)
 		"non-numeric rows": {"randarray(\"x\", 2)", "#VALUE!"},
 	}
 	for name, tc := range cases {

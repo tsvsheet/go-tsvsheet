@@ -18,6 +18,7 @@ func TestDefaultLimits_Values(t *testing.T) {
 	assert.Equal(t, 5_000_000, l.ResultCells)
 	assert.Equal(t, 1_000_000, l.GridDim)
 	assert.Equal(t, 1<<20, l.ResultBytes)
+	assert.Equal(t, 5_000_000, l.SpanCells)
 }
 
 func TestBrowserLimits_Values(t *testing.T) {
@@ -27,6 +28,7 @@ func TestBrowserLimits_Values(t *testing.T) {
 	assert.Equal(t, 100_000, l.ResultCells)
 	assert.Equal(t, 20_000, l.GridDim)
 	assert.Equal(t, 64<<10, l.ResultBytes)
+	assert.Equal(t, 1_000_000, l.SpanCells)
 }
 
 // computeWithCell parses src, computes it with the injected limits, and returns
@@ -52,7 +54,7 @@ func TestComputeWith_HonorsInjectedCellBudget(t *testing.T) {
 
 	tiny := engine.Limits{ResultCells: 5, GridDim: 5, ResultBytes: 5}
 	assert.Equal(t, "1", computeWithCell(t, "=sequence(2, 2)\n", tiny))                     // 4 cells <= 5
-	assert.Equal(t, string(engine.ErrValue), computeWithCell(t, "=sequence(3, 3)\n", tiny)) // 9 > 5
+	assert.Equal(t, string(engine.ErrLimit), computeWithCell(t, "=sequence(3, 3)\n", tiny)) // 9 > 5: budget refusal
 }
 
 func TestComputeWith_HonorsInjectedByteBudget(t *testing.T) {
@@ -60,7 +62,105 @@ func TestComputeWith_HonorsInjectedByteBudget(t *testing.T) {
 
 	tiny := engine.Limits{ResultCells: 5, GridDim: 5, ResultBytes: 5}
 	assert.Equal(t, "aaaaa", computeWithCell(t, "=rept(\"a\", 5)\n", tiny))                 // 5 bytes <= 5
-	assert.Equal(t, string(engine.ErrValue), computeWithCell(t, "=rept(\"a\", 6)\n", tiny)) // 6 > 5
+	assert.Equal(t, string(engine.ErrLimit), computeWithCell(t, "=rept(\"a\", 6)\n", tiny)) // 6 > 5: budget refusal
+}
+
+// TestComputeWith_RangeSpanOverBudgetIsLimit pins the span budget at the range
+// choke point: a reference whose written rectangle holds more cells than the
+// budget is #LIMIT! before any allocation or read — a written reference can
+// never drive the materialization it names. In-budget ranges keep today's
+// semantics exactly (the 6-cell sum below still computes under a 6-cell
+// budget), and out-of-grid corners inside the budget stay #REF!.
+func TestComputeWith_RangeSpanOverBudgetIsLimit(t *testing.T) {
+	t.Parallel()
+
+	grid := "1\t2\t3\n4\t5\t6\n=sum(A1:C2)\t=sum(A1:C2)\t=index(A1:C2, 1, 1)\n"
+	sixCells := engine.Limits{ResultCells: 6, GridDim: 10, ResultBytes: 100}
+	fiveCells := engine.Limits{ResultCells: 5, GridDim: 10, ResultBytes: 100}
+
+	s, err := engine.Parse([]byte(grid))
+	require.NoError(t, err)
+	within := s.ComputeWith(engine.ComputeOptions{At: time.Now(), Limits: sixCells})
+	assert.Equal(t, "21", within[2][0])
+	assert.Equal(t, "1", within[2][2])
+
+	over := s.ComputeWith(engine.ComputeOptions{At: time.Now(), Limits: fiveCells})
+	assert.Equal(t, string(engine.ErrLimit), over[2][0], "cells path (sum) refuses the 6-cell rectangle")
+	assert.Equal(t, string(engine.ErrLimit), over[2][2], "matrix path (index) refuses the same rectangle")
+}
+
+// TestSpanAndResultBudgetsAreSeparateCeilings pins that SpanCells and
+// ResultCells bound different costs: with a 5-cell result budget and a 10-cell
+// span budget, reading a 6-cell rectangle computes (it is a READ the span
+// budget authorises) while a 9-cell SEQUENCE result is still refused (it
+// WRITES cells the result budget bounds). Sharing one ceiling broke the
+// shipped BrowserLimits: a grid its GridDim explicitly permits could not sum
+// its own columns.
+func TestSpanAndResultBudgetsAreSeparateCeilings(t *testing.T) {
+	t.Parallel()
+
+	grid := "1\t2\t3\n4\t5\t6\n=sum(A1:C2)\t=sequence(3, 3)\n"
+	split := engine.Limits{ResultCells: 5, GridDim: 10, ResultBytes: 100, SpanCells: 10}
+
+	s, err := engine.Parse([]byte(grid))
+	require.NoError(t, err)
+	g := s.ComputeWith(engine.ComputeOptions{At: time.Now(), Limits: split})
+	assert.Equal(t, "21", g[2][0], "a 6-cell read is within the 10-cell span budget")
+	assert.Equal(t, string(engine.ErrLimit), g[2][1], "a 9-cell result still exceeds the 5-cell result budget")
+}
+
+// TestSpanBudgetTreatsANonPositiveSpanCellsAsUnsetNeverAsRefuseEverything pins
+// spanBudget's fallback contract: zero or negative SpanCells means "unset, use
+// ResultCells", so a pre-SpanCells caller (or a nonsense negative) keeps a
+// working ceiling instead of a budget that refuses every reference.
+func TestSpanBudgetTreatsANonPositiveSpanCellsAsUnsetNeverAsRefuseEverything(t *testing.T) {
+	t.Parallel()
+
+	for name, spanCells := range map[string]int{"zero": 0, "negative": -1} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			l := engine.Limits{ResultCells: 10, GridDim: 10, ResultBytes: 100, SpanCells: spanCells}
+			got := computeWithCell(t, "=sum(A2:C3)\t\n1\t2\t3\n4\t5\t6\n", l)
+			assert.Equal(t, "21", got, "a 6-cell span computes under the 10-cell fallback")
+		})
+	}
+}
+
+// TestCompute_GiantWrittenRangeIsLimitNotOOM pins the work-order acceptance
+// (015): the literal rectangles below — 50 billion rows; DEJTLX is column
+// ~50 million in bijective base-26 — used to be materialized value-by-value
+// before any check, OOM-killing the process from a single formula on a tiny
+// file. The span budget refuses them from the corners alone under
+// DefaultLimits, in O(1) memory, on both resolution paths. Each compute runs
+// under a deadline so a regression FAILS with a diagnosis instead of
+// exhausting the machine and presenting as a runner death.
+func TestCompute_GiantWrittenRangeIsLimitNotOOM(t *testing.T) {
+	t.Parallel()
+
+	for name, expr := range map[string]string{
+		"tall, cells path": "sum(A1:A50000000000)",
+		"wide, cells path": "sum(A1:DEJTLX1)",
+		"matrix path":      "index(A1:ZZ99999999, 1, 1)",
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			got := make(chan string, 1)
+			go func() {
+				s, err := engine.Parse([]byte("2\t=" + expr + "\t3\t4\n"))
+				if err != nil {
+					got <- "parse: " + err.Error()
+					return
+				}
+				got <- s.Compute()[0][1]
+			}()
+			select {
+			case v := <-got:
+				assert.Equal(t, string(engine.ErrLimit), v)
+			case <-time.After(10 * time.Second):
+				t.Fatal("no refusal within 10s — the written rectangle is being materialized")
+			}
+		})
+	}
 }
 
 func TestSet_HonorsInjectedGridLimit(t *testing.T) {
@@ -94,7 +194,9 @@ func TestMaxSafeMagnitudeRefusesWhatIntegerArithmeticCannotCarry(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.NotPanics(t, func() {
-			assert.Contains(t, []string{"#VALUE!", "#NUM!"}, sheet.Compute()[1][0], formula)
+			// A saturated magnitude is refused at the conversion (#VALUE!/#NUM!)
+			// or, where the conversion admits it, by the cell budget (#LIMIT!).
+			assert.Contains(t, []string{"#VALUE!", "#NUM!", "#LIMIT!"}, sheet.Compute()[1][0], formula)
 		}, formula)
 	}
 }

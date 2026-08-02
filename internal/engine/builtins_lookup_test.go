@@ -85,3 +85,42 @@ func TestLookup_ArityAndArgErrors(t *testing.T) {
 		})
 	}
 }
+
+// TestLookup_RefusedRangePropagates pins that a wholesale range refusal
+// propagates through every lookup shape instead of laundering: before the
+// out-of-band refusal, vlookup/match over an unreadable table answered #N/A
+// ("searched and found nothing") and rows() answered 1 — both plausible and
+// both false, since nothing was ever searched or counted.
+func TestLookup_RefusedRangePropagates(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]string{
+		"vlookup(2, A1:B50000000000, 2)":       string(engine.ErrLimit),
+		"hlookup(2, A1:ZZZZZZ2, 2)":            string(engine.ErrLimit),
+		"match(2, A1:A50000000000)":            string(engine.ErrLimit),
+		"index(A1:A50000000000, 1)":            string(engine.ErrLimit),
+		"rows(A1:A50000000000)":                string(engine.ErrLimit),
+		"columns(A1:DEJTLX1)":                  string(engine.ErrLimit),
+		"vlookup(2, ZZZZZZZZZ1:ZZZZZZZZZ9, 1)": string(engine.ErrRef),
+		"match(2, \"missing\"!A1:A9)":          string(engine.ErrRef),
+	}
+	for expr, want := range cases {
+		t.Run(expr, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, want, formula1(t, expr))
+		})
+	}
+}
+
+// TestLookup_ErrorHolesInAResolvedTableAreScannedPast pins the hole tolerance
+// the refusal distinction protects: a lookup whose table RESOLVES scans past a
+// #REF! hole from a ragged grid and can still match — the reason a wholesale
+// refusal cannot simply be spelled as a 1×1 error block.
+func TestLookup_ErrorHolesInAResolvedTableAreScannedPast(t *testing.T) {
+	t.Parallel()
+
+	// Row 2 is shorter than row 1: B2 is a #REF! hole in A1:B2, but the key 1
+	// matches A1 before any hole is touched.
+	g := compute(t, "1\thit\t=vlookup(1, A1:B2, 2)\n9\n")
+	assert.Equal(t, "hit", cellAt(t, g, 0, 2))
+}

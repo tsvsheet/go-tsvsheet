@@ -55,7 +55,11 @@ func (r resolver) seriesCall(fn seriesSpec, args []tsvt.Expr) Value {
 		}
 		span = s
 	}
-	nums, bad := seriesNumbers(flatten1D(r.argMatrix(args[0])))
+	m, refused := r.argMatrix(args[0])
+	if refused.isError() {
+		return refused
+	}
+	nums, bad := seriesNumbers(flatten1D(m))
 	if bad.isError() {
 		return bad
 	}

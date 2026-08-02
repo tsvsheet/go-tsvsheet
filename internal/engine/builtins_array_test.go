@@ -81,8 +81,8 @@ func TestArray_Errors(t *testing.T) {
 		"sequence()":          string(engine.ErrValue), // arity
 		"sequence(0)":         string(engine.ErrValue), // rows < 1
 		"sequence(1, 0)":      string(engine.ErrValue), // cols < 1
-		"sequence(6000000)":   string(engine.ErrValue), // exceeds the default cell budget (OOM guard)
-		"sequence(3000,3000)": string(engine.ErrValue), // rows×cols (9M) exceeds the budget
+		"sequence(6000000)":   string(engine.ErrLimit), // exceeds the default cell budget (OOM guard, §6)
+		"sequence(3000,3000)": string(engine.ErrLimit), // rows×cols (9M) exceeds the budget (§6)
 		"transpose(A1, A2)":   string(engine.ErrValue), // arity
 		"unique(A1, A2)":      string(engine.ErrValue),
 		"sort(A1, A2)":        string(engine.ErrValue),
@@ -189,4 +189,27 @@ func TestArray_ScalarContextReducesToTopLeft(t *testing.T) {
 	g := compute(t, "=sequence(2, 2) + 10\n\n=if(sequence(2, 2), \"y\", \"n\")\n")
 	assert.Equal(t, "11", cellAt(t, g, 0, 0))
 	assert.Equal(t, "y", cellAt(t, g, 2, 0))
+}
+
+// TestArray_RefusedRangePropagates pins refusal propagation through the array
+// builtins: a refused range must surface the refusal, never an empty or 1×1
+// "array" that downstream code treats as data.
+func TestArray_RefusedRangePropagates(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]string{
+		"sort(A1:A50000000000)":          string(engine.ErrLimit),
+		"unique(A1:A50000000000)":        string(engine.ErrLimit),
+		"transpose(A1:DEJTLX1)":          string(engine.ErrLimit),
+		"flatten(A1:A50000000000)":       string(engine.ErrLimit),
+		"filter(A1:A50000000000, A1:A4)": string(engine.ErrLimit),
+		"filter(A1:A2, A1:A50000000000)": string(engine.ErrLimit),
+		"sort(ZZZZZZZZZ1:ZZZZZZZZZ9)":    string(engine.ErrRef),
+	}
+	for expr, want := range cases {
+		t.Run(expr, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, want, formula1(t, expr))
+		})
+	}
 }

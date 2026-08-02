@@ -1,37 +1,11 @@
-// Paste and the clipboard block: the paste half of the copy-time reference
-// model (spec 010). A copied block travels as plain TSV text — ParseBlock is
-// the one definition of how that text becomes a grid again — and Paste places
-// it with every formula rebased by the single delta target−origin, using the
-// same AST transform Fill applies per target (fill.go). Like the rest of the
-// family, everything re-serializes through the canonical renderer.
+// Paste: the paste half of the copy-time reference model (spec 010). Paste
+// places a clipboard block (block.go) with every formula rebased by the single
+// delta target−origin, using the same AST transform Fill applies per target
+// (fill.go). Like the rest of the family, everything re-serializes through the
+// canonical renderer.
 package engine
 
-import (
-	"strings"
-
-	"github.com/tsvsheet/go-tsvsheet/internal/constants"
-)
-
-// BlockText is clipboard-block source text: TAB-separated cells on
-// newline-separated rows, as a copied range travels through a clipboard.
-type BlockText string
-
-// ParseBlock reads a clipboard block: CRLF and lone CR normalize to LF,
-// exactly one trailing newline is ignored, rows split on LF and cells on TAB.
-// Every line is data — a clipboard block has no comment or directive
-// semantics, unlike a .tsvt file. An empty text is a single empty cell (the
-// TSV serialization of one empty cell IS the empty string), so pasting it
-// clears its target.
-func ParseBlock(text BlockText) Grid {
-	normalized := strings.NewReplacer("\r\n", "\n", "\r", "\n").Replace(string(text))
-	trimmed := strings.TrimSuffix(normalized, "\n")
-	rows := strings.Split(trimmed, "\n")
-	out := make(Grid, len(rows))
-	for r, row := range rows {
-		out[r] = strings.Split(row, tab)
-	}
-	return out
-}
+import "github.com/tsvsheet/go-tsvsheet/internal/constants"
 
 // Paste returns a new sheet with block — a grid of raw cell texts, as copied
 // with its top-left at origin — placed with its top-left at at: every formula
@@ -110,7 +84,11 @@ func pasteBounds(at, origin Address, block Grid, limits Limits) error {
 	if origin.Row < 0 || origin.Col < 0 {
 		return constants.ErrInvalidValue.With(nil, "origin", origin.String())
 	}
-	if at.Row+len(block) > limits.GridDim || at.Col+widestBlockRow(block) > limits.GridDim {
+	// Subtraction, not addition: at.Row is untrusted up to MaxInt (ParseAddress
+	// accepts Atoi's ceiling), so `at.Row+len(block)` wraps negative and passes.
+	// GridDim minus a block dimension cannot wrap, and a block larger than the
+	// whole grid makes the bound negative, refusing every position.
+	if at.Row > limits.GridDim-len(block) || at.Col > limits.GridDim-widestBlockRow(block) {
 		return constants.ErrInvalidValue.With(nil, "paste exceeds the grid limit", at.String())
 	}
 	return nil

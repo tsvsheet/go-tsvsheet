@@ -177,7 +177,7 @@ func TestExprDifferentialInjected(t *testing.T) {
 		{
 			name: "limits bound an array result",
 			expr: `sequence(2,2)`,
-			want: "#VALUE!",
+			want: "#LIMIT!",
 			opts: tsvsheet.ComputeOptions{
 				At:     exprClock(),
 				Limits: tsvsheet.Limits{ResultCells: 2, GridDim: 100, ResultBytes: 100},

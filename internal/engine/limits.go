@@ -15,35 +15,66 @@ type Limits struct {
 	ResultCells int // cells in one array formula result (e.g. SEQUENCE)
 	GridDim     int // the highest row or column index the grid may grow to (Set)
 	ResultBytes int // bytes in one string formula result (e.g. REPT)
+	SpanCells   int // cells one written reference's rectangle may cover; 0 falls back to ResultCells
 }
 
 // DefaultLimits are generous for real spreadsheets while still bounding OOM.
 func DefaultLimits() Limits {
-	return Limits{ResultCells: 5_000_000, GridDim: 1_000_000, ResultBytes: 1 << 20}
+	return Limits{ResultCells: 5_000_000, GridDim: 1_000_000, ResultBytes: 1 << 20, SpanCells: 5_000_000}
 }
 
 // BrowserLimits are the tighter ceilings the WASM build applies, sized for a
-// browser tab rather than a workstation.
+// browser tab rather than a workstation. SpanCells sits well above ResultCells
+// deliberately: reading a large in-grid range (a whole-column SUM) is ordinary
+// spreadsheet use the grid dimension already permits, while a large array
+// RESULT (a SEQUENCE spill) writes that many new cells — the two budgets bound
+// different costs and must not share a ceiling.
 func BrowserLimits() Limits {
-	return Limits{ResultCells: 100_000, GridDim: 20_000, ResultBytes: 64 << 10}
+	return Limits{ResultCells: 100_000, GridDim: 20_000, ResultBytes: 64 << 10, SpanCells: 1_000_000}
+}
+
+// cellBudget is a ceiling on the cells a rectangle may cover, in whichever
+// role (result or span) it is enforced.
+type cellBudget int64
+
+// spanBudget is the cell budget for one written reference's rectangle: the
+// dedicated SpanCells when positive, else ResultCells — so a caller
+// constructing Limits before SpanCells existed (a --max-cells flag filling the
+// other three fields) keeps its intended single ceiling. A zero or negative
+// SpanCells is "unset", never a refuse-everything budget.
+func (l Limits) spanBudget() cellBudget {
+	if l.SpanCells > 0 {
+		return cellBudget(l.SpanCells)
+	}
+	return cellBudget(l.ResultCells)
 }
 
 // resultDim is a row or column count of an array formula result.
 type resultDim int
 
 // tooManyCells reports whether a rows×cols array result exceeds the cell budget.
+func (l Limits) tooManyCells(rows, cols resultDim) bool {
+	return overCellBudget(cellBudget(l.ResultCells), rows, cols)
+}
+
+// spanTooLarge reports whether a rows×cols reference rectangle exceeds the span
+// budget.
+func (l Limits) spanTooLarge(rows, cols resultDim) bool {
+	return overCellBudget(l.spanBudget(), rows, cols)
+}
+
+// overCellBudget reports whether a rows×cols rectangle exceeds budget cells.
 //
 // Each dimension is checked against the budget before they are multiplied. The
 // product alone is not enough: int64 multiplication wraps, and two dimensions
 // of 9223372036854775807 multiply to 1, which is under every budget — so a
 // request for 9.2 quintillion cells was authorised and the allocation panicked.
 // A single dimension over the budget is already over it, whatever the other is.
-func (l Limits) tooManyCells(rows, cols resultDim) bool {
-	budget := int64(l.ResultCells)
-	if int64(rows) > budget || int64(cols) > budget || rows < 0 || cols < 0 {
+func overCellBudget(budget cellBudget, rows, cols resultDim) bool {
+	if cellBudget(rows) > budget || cellBudget(cols) > budget || rows < 0 || cols < 0 {
 		return true
 	}
-	return int64(rows)*int64(cols) > budget
+	return cellBudget(rows)*cellBudget(cols) > budget
 }
 
 // effectiveLimits resolves the limits for a compute pass: the zero value (an

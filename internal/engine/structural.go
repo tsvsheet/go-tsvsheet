@@ -1,15 +1,24 @@
 package engine
 
-import "github.com/tsvsheet/go-tsvsheet/internal/tsvt"
+import (
+	"math"
+
+	"github.com/tsvsheet/go-tsvsheet/internal/tsvt"
+)
 
 var rowAxis = axis{
-	get: func(c tsvt.CellRef) lineIndex { return lineIndex(c.Row - 1) },
+	get: func(c tsvt.CellRef) (lineIndex, boolResult) { return lineIndex(c.Row - 1), true },
 	set: func(c tsvt.CellRef, i lineIndex) tsvt.CellRef { c.Row = int(i) + 1; return c },
+	max: math.MaxInt - 1, // set adds 1; anything renderable as an int row is fine
 }
 
 var colAxis = axis{
-	get: func(c tsvt.CellRef) lineIndex { return lineIndex(lettersToIndex(columnLetters(c.Col))) },
+	get: func(c tsvt.CellRef) (lineIndex, boolResult) {
+		col, ok := lettersToIndex(columnLetters(c.Col))
+		return lineIndex(col), ok
+	},
 	set: func(c tsvt.CellRef, i lineIndex) tsvt.CellRef { c.Col = indexToLetters(colIndex(i)); return c },
+	max: maxColumnMagnitude - 1, // the last column lettersToIndex round-trips
 }
 
 // InsertRow returns a new sheet with a blank row inserted before at.Row; every
@@ -170,10 +179,17 @@ func shiftReference(ref tsvt.Reference, ax axis, tr transform) tsvt.Expr {
 }
 
 // shiftPoint shifts a single-cell reference, collapsing to #REF! when the edit
-// deletes the cell it names.
+// deletes the cell it names — or shifts it past what the axis can render, so an
+// edit never mints a reference the rest of the library refuses to parse. A
+// coordinate already past the addressable bound is left verbatim: the edit
+// cannot touch it, and it computes as an error regardless.
 func shiftPoint(rangeRef tsvt.RangeRef, ax axis, tr transform) tsvt.Expr {
-	moved, ok := tr.point(ax.get(rangeRef.From))
-	if !ok {
+	coord, isAddressable := ax.get(rangeRef.From)
+	if !isAddressable {
+		return tsvt.RefOperand{Ref: rangeRef}
+	}
+	moved, ok := tr.point(coord)
+	if !ok || !ax.inBounds(moved) {
 		return refError()
 	}
 	return tsvt.RefOperand{Ref: tsvt.RangeRef{From: ax.set(rangeRef.From, moved)}}
@@ -186,12 +202,15 @@ func shiftPoint(rangeRef tsvt.RangeRef, ax axis, tr transform) tsvt.Expr {
 // The original From/To endpoint identity (and each endpoint's other-axis
 // coordinate) is preserved.
 func shiftSpan(rangeRef tsvt.RangeRef, ax axis, tr transform) tsvt.Expr {
-	fromC := ax.get(rangeRef.From)
-	toC := ax.get(*rangeRef.To)
+	fromC, fromInBounds := ax.get(rangeRef.From)
+	toC, toInBounds := ax.get(*rangeRef.To)
+	if !fromInBounds || !toInBounds {
+		return tsvt.RefOperand{Ref: rangeRef} // an unaddressable endpoint: the edit cannot touch it; left verbatim
+	}
 	loC, hiC := orderLines(fromC, toC)
 	newLo, loOK := tr.lo(loC)
 	newHi, hiOK := tr.hi(hiC)
-	if !loOK || !hiOK || newLo > newHi {
+	if !loOK || !hiOK || newLo > newHi || !ax.inBounds(newLo) || !ax.inBounds(newHi) {
 		return refError()
 	}
 	fromCoord, toCoord := newLo, newHi

@@ -43,7 +43,7 @@ func (r resolver) foreign(file string) (computer, foreignStatus) {
 func (r resolver) foreignCells(ref tsvt.RangeRef) cellset {
 	target, status := r.foreign(ref.File)
 	if status != foreignOK {
-		return cellset{values: []Value{errorValue(foreignError(status))}, isSingle: boolResult(ref.To == nil)}
+		return cellset{values: []Value{refusalValue(foreignError(status))}, isSingle: boolResult(ref.To == nil)}
 	}
 	return resolver{comp: target}.resolveOperand(stripFile(ref))
 }
@@ -53,7 +53,7 @@ func (r resolver) foreignCells(ref tsvt.RangeRef) cellset {
 func (r resolver) foreignMatrix(ref tsvt.RangeRef) [][]Value {
 	target, status := r.foreign(ref.File)
 	if status != foreignOK {
-		return [][]Value{{errorValue(foreignError(status))}}
+		return [][]Value{{refusalValue(foreignError(status))}}
 	}
 	return resolver{comp: target}.rangeMatrix(stripFile(ref))
 }

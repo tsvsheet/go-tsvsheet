@@ -72,7 +72,11 @@ func parseEditCol(at editLine, s editField) (Address, error) {
 	if letters == "" || digits != "" || len(letters) != len(s) {
 		return Address{}, constants.ErrEditsAddress.With(nil, "line", int(at), "column", string(s))
 	}
-	return Address{Col: lettersToIndex(columnLetters(letters))}, nil
+	col, ok := lettersToIndex(columnLetters(letters))
+	if !ok {
+		return Address{}, constants.ErrEditsAddress.With(nil, "line", int(at), "column", string(s))
+	}
+	return Address{Col: col}, nil
 }
 
 // parseEditSpan parses a rectangle argument: `A1:B9`, or a single cell as the
@@ -158,12 +162,21 @@ func parseFill(at editLine, args []string) (editApply, error) {
 	}, nil
 }
 
-// withinGrid refuses a target rectangle reaching beyond the grid limit,
-// mirroring the validation Set applies to a single address.
+// withinGrid refuses a target rectangle reaching beyond the grid limit —
+// mirroring the validation Set applies to a single address — or covering more
+// cells than the result budget: every filled cell is written, and the corner
+// check alone authorises an 18-billion-cell rectangle from two corners that are
+// each individually under GridDim.
 func withinGrid(to Span, limits Limits) error {
 	corner := Address{Row: max(to.From.Row, to.To.Row), Col: max(to.From.Col, to.To.Col)}
 	if corner.Row >= limits.GridDim || corner.Col >= limits.GridDim {
 		return constants.ErrInvalidValue.With(nil, "span exceeds the grid limit", corner.String())
+	}
+	area := normalized(to)
+	rows := resultDim(area.To.Row - area.From.Row + 1)
+	cols := resultDim(area.To.Col - area.From.Col + 1)
+	if limits.tooManyCells(rows, cols) {
+		return constants.ErrInvalidValue.With(nil, "span exceeds the cell budget", corner.String())
 	}
 	return nil
 }

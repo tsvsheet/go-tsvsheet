@@ -110,7 +110,8 @@ type Value = engine.Value
 // depends on itself), #N/A (lookup miss / NA()), #NUM! (numeric domain),
 // #NULL! (empty range intersection), #SPILL! (blocked dynamic-array spill),
 // #IMPORT! (a content-typed import failed — disabled, denied, or a bad
-// handshake).
+// handshake), #LIMIT! (a reference or result larger than the configured cell
+// budget).
 const (
 	ErrRef    ErrorValue = engine.ErrRef
 	ErrValue  ErrorValue = engine.ErrValue
@@ -122,6 +123,7 @@ const (
 	ErrNull   ErrorValue = engine.ErrNull
 	ErrSpill  ErrorValue = engine.ErrSpill
 	ErrImport ErrorValue = engine.ErrImport
+	ErrLimit  ErrorValue = engine.ErrLimit
 )
 
 // Parse reads a .tsvt grid: each TAB-separated field is a literal, or — when it
