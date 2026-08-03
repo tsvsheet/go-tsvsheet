@@ -43,6 +43,25 @@ func TestArgModeGivesAScalarSlotExactlyOneValue(t *testing.T) {
 	assert.Equal(t, "5", got[4], "and one cell in the same slot computes")
 }
 
+func TestTwoScalarsThenCellsHoldsTextJoinLeadingSlots(t *testing.T) {
+	// twoScalarsThenCells declares TEXTJOIN's delimiter and ignore-empty flag
+	// as scalar slots ahead of the flattened text operands, so a range in the
+	// third slot cannot shift them. Both directions are asserted: the range
+	// flattens where it is allowed, and is refused in the two slots it must
+	// never slide into.
+	got := computedRow(t,
+		"a\t\tb"+
+			"\t=textjoin(\"-\", TRUE, A1:C1)"+
+			"\t=textjoin(\"-\", FALSE, A1:C1)"+
+			"\t=textjoin(A1:C1, TRUE, \"x\", \"y\")"+
+			"\t=textjoin(\"-\", A1:C1, \"x\", \"y\")")
+
+	assert.Equal(t, "a-b", got[3], "the range flattens in the cells slot, the delimiter still delimits")
+	assert.Equal(t, "a--b", got[4], "the second scalar is still the ignore-empty flag, not a joined cell")
+	assert.Equal(t, "#VALUE!", got[5], "the delimiter slot is scalar: a range is refused, not flattened")
+	assert.Equal(t, "#VALUE!", got[6], "the ignore-empty slot is scalar for the same reason")
+}
+
 func TestArgCellsExpandsARangeAndAnArrayAlike(t *testing.T) {
 	// An expression that evaluates to an array is consumed exactly like a
 	// range, so an aggregate over a sorted block aggregates the block.
