@@ -65,6 +65,15 @@ func (l Limits) spanBudget() cellBudget {
 	return cellBudget(l.ResultCells)
 }
 
+// EffectiveResidentCells is the resolved resident ceiling a caller may vet
+// against BEFORE loading (spec 018): the zero value falls back to
+// DefaultLimits, then ResidentCells falls back to ResultCells — exactly the
+// policy OpenSheet and the bounded parses apply, exported so no frontend
+// re-implements the fallback.
+func (l Limits) EffectiveResidentCells() int64 {
+	return int64(effectiveLimits(l).residentBudget())
+}
+
 // residentBudget is the cell count at or under which a document loads fully
 // resident: the dedicated ResidentCells when positive, else ResultCells — the
 // same single-ceiling fallback SpanCells applies, so a --max-cells constructor

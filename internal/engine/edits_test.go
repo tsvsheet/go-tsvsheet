@@ -157,3 +157,24 @@ func TestEditsTextIsACopy(t *testing.T) {
 func TestApplyPreservesComments(t *testing.T) {
 	assert.Equal(t, "#. header\n1\t9\n", applied(t, "#. header\n1\t2\n", "setCell\tB1\t9\n"))
 }
+
+// TestParseEditsWithRefusesOverBudgetBatches pins the 018 edits gate: a batch
+// with more op lines than the resident ceiling refuses before any op parses
+// (the malformed op on the last line is never reached), and an in-budget
+// batch parses exactly as ParseEdits does.
+func TestParseEditsWithRefusesOverBudgetBatches(t *testing.T) {
+	t.Parallel()
+
+	over := []byte("setCell\tA1\t1\nsetCell\tA2\t2\nnot-an-op\n")
+	_, err := engine.ParseEditsWith(over, engine.Limits{ResidentCells: 2})
+	require.ErrorIs(t, err, constants.ErrDocTooLarge)
+	assert.NotErrorIs(t, err, constants.ErrEditsOp, "the gate precedes op parsing")
+
+	src := []byte("setCell\tA1\t1\n")
+	bounded, err := engine.ParseEditsWith(src, engine.Limits{ResidentCells: 2})
+	require.NoError(t, err)
+	unbounded, err := engine.ParseEdits(src)
+	require.NoError(t, err)
+	assert.Equal(t, unbounded.Len(), bounded.Len())
+	assert.Equal(t, unbounded.Text(), bounded.Text())
+}

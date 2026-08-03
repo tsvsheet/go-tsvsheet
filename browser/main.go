@@ -156,8 +156,11 @@ func addr(row, col js.Value) tsvsheet.Address {
 
 // parse is the shared first step of every function: the source is args[0],
 // parsed with its line layout retained so serialization preserves comments.
+// The parse is bounded by BrowserLimits (spec 018): a document over the
+// browser's resident budget refuses as ErrDocTooLarge instead of
+// materializing a tab-killing allocation.
 func parse(args []js.Value) (tsvsheet.Document, error) {
-	return tsvsheet.ParseDocument([]byte(args[0].String()))
+	return tsvsheet.ParseDocumentWith([]byte(args[0].String()), tsvsheet.BrowserLimits())
 }
 
 // compute parses and renders the source (args: source).

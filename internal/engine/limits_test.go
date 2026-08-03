@@ -212,3 +212,14 @@ func TestTooManyCellsCountsADimensionThatAloneExceedsTheBudget(t *testing.T) {
 
 	assert.NotEqual(t, "", sheet.Compute()[1][0], "a refusal, not an allocation")
 }
+
+// TestEffectiveResidentCellsMatchesTheLoadPolicy pins the exported ceiling
+// against the policy the loads actually apply: zero value → the default,
+// dedicated budget wins, ResultCells is the single-ceiling fallback.
+func TestEffectiveResidentCellsMatchesTheLoadPolicy(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, int64(engine.DefaultLimits().ResidentCells), engine.Limits{}.EffectiveResidentCells())
+	assert.Equal(t, int64(7), engine.Limits{ResidentCells: 7, ResultCells: 9}.EffectiveResidentCells())
+	assert.Equal(t, int64(9), engine.Limits{ResultCells: 9}.EffectiveResidentCells())
+}
