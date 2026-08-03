@@ -36,11 +36,14 @@ type WindowedSheet struct {
 // identical to Parse's; an over-budget one stands up a WindowedSheet without
 // materializing anything.
 func OpenSheet(src ByteSource, limits Limits) (Sheet, *WindowedSheet, error) {
-	source, err := newSheetSource(readerAtSize{at: src.ReadAt, size: index.SourceSize(src.Size)})
+	effective := effectiveLimits(limits)
+	source, err := newSheetSource(
+		readerAtSize{at: src.ReadAt, size: index.SourceSize(src.Size)},
+		index.CellCount(effective.residentBudget()),
+	)
 	if err != nil {
 		return Sheet{}, nil, err
 	}
-	effective := effectiveLimits(limits)
 	if cellBudget(source.ix.Census().Cells) <= effective.residentBudget() {
 		sheet, err := materializeSheet(source)
 		return sheet, nil, err
@@ -49,10 +52,19 @@ func OpenSheet(src ByteSource, limits Limits) (Sheet, *WindowedSheet, error) {
 }
 
 // ByteSource is an any-size byte source: a file, a spooled stream, or
-// in-memory bytes, with its length.
+// in-memory bytes, with its length. Size is trusted: bytes past it are not
+// read, and a Size shorter than the actual data truncates at that byte — a
+// caller pairing a stat with an open owns that pairing.
 type ByteSource struct {
 	ReadAt readAtSource
 	Size   int64
+}
+
+// CachedCells reports the cells currently resident in the windowed block
+// cache — bounded by the resident budget, and honest telemetry for a
+// frontend's status line.
+func (w WindowedSheet) CachedCells() int64 {
+	return int64(w.source.reader.CachedCells())
 }
 
 // Census reports the windowed document's totals.
@@ -79,80 +91,4 @@ func (w WindowedSheet) Rows(from, n int) (Grid, error) {
 		}
 	}
 	return out, nil
-}
-
-// lazyCells reads cells on demand through the block reader for a windowed
-// evaluation, latching the first source failure behind a shared pointer: a
-// read that fails answers out-of-grid to keep evaluation total, and the
-// latched error fails the whole ComputeRows call afterwards — a broken source
-// is an error, never wrong data (pinned by
-// TestLazyCellsNeverServeWrongDataAfterAFailure).
-type lazyCells struct {
-	fail   *error
-	source sheetSource
-}
-
-// newLazyCells stands a lazy backing with a fresh latch.
-func newLazyCells(source sheetSource) lazyCells {
-	return lazyCells{fail: new(error), source: source}
-}
-
-// at reads one cell through the block cache.
-func (l lazyCells) at(row rowIndex, col colIndex) (cell, boolResult) {
-	if *l.fail != nil || row < 0 || col < 0 {
-		return cell{}, false
-	}
-	rows, err := l.source.reader.ReadRows(index.GridRow(row), 1)
-	if err != nil {
-		*l.fail = err
-		return cell{}, false
-	}
-	if len(rows) == 0 || int(col) >= len(rows[0]) {
-		return cell{}, false
-	}
-	return rows[0][col], true
-}
-
-// ComputeRows evaluates the window [from, from+n): literals as their values,
-// formulas through the one resolver over a sparse memo bounded by the
-// touched-cells budget — the design's cumulative bound, so computing the
-// visible rows stays bounded regardless of what they reference; past the
-// budget a cell answers #LIMIT!. An array-producing formula renders its
-// top-left value (windows do not spill). A source failure during evaluation
-// fails the call as ErrReadInput rather than serving partial data.
-func (w WindowedSheet) ComputeRows(from, n int, opts ComputeOptions) (Grid, error) {
-	rows, err := w.source.reader.ReadRows(index.GridRow(from), index.RowCount(n))
-	if err != nil {
-		return nil, readFailure(err)
-	}
-	lazy := newLazyCells(w.source)
-	comp := lazy.computer(effectiveLimits(w.limits), opts)
-	out := make(Grid, len(rows))
-	for r, row := range rows {
-		out[r] = make([]string, len(row))
-		for c, cl := range row {
-			out[r][c] = comp.cellValue(rowIndex(from+r), colIndex(c), cl).String()
-		}
-	}
-	if *lazy.fail != nil {
-		return nil, readFailure(*lazy.fail)
-	}
-	return out, nil
-}
-
-// computer builds the sparse-memo computer a window evaluates under this lazy
-// backing: the touched-cells budget and the pass clock/limits the options
-// carry; every value copy shares the latch through its pointer. Constructed
-// directly — newComputer's dense memo sizes slabs by the grid height, which on
-// a windowed document is the very allocation this path exists to avoid.
-func (l lazyCells) computer(limits Limits, opts ComputeOptions) computer {
-	return computer{
-		now:     opts.At,
-		rng:     newPassRNG(prngSeed(opts.At.UnixNano())),
-		sheet:   Sheet{lazy: &l},
-		memo:    newSparseMemo(limits.touchedBudget()),
-		limits:  limits,
-		fetcher: opts.Fetcher,
-		tick:    opts.Tick,
-	}
 }

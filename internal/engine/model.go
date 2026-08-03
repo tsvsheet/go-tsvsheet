@@ -54,7 +54,7 @@ func Parse(src []byte) (Sheet, error) {
 	source, err := newSheetSource(readerAtSize{
 		at:   bytes.NewReader(src),
 		size: index.SourceSize(len(src)),
-	})
+	}, allCells)
 	if err != nil {
 		return Sheet{}, err
 	}
@@ -148,12 +148,14 @@ func (s Sheet) blocksSpill(anchor, target Address) boolResult {
 }
 
 // isEmptyCell reports whether a source cell is empty (spillable): out of the
-// source grid, or a blank non-formula cell.
+// source grid, or a blank non-formula cell. It reads through at(), the one
+// seam both backings share, so spill blocking answers identically for
+// resident and windowed sheets.
 func (s Sheet) isEmptyCell(at Address) boolResult {
-	if at.Row >= s.height() || at.Col >= len(s.rowsView()[at.Row]) {
+	cl, inGrid := s.at(rowIndex(at.Row), colIndex(at.Col))
+	if !inGrid {
 		return true
 	}
-	cl := s.rowsView()[at.Row][at.Col]
 	return boolResult(cl.text == "" && !bool(cl.isFormula()))
 }
 

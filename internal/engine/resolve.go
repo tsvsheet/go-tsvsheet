@@ -46,23 +46,26 @@ func (c computer) cellValue(row rowIndex, col colIndex, cl cell) Value {
 
 // read returns the value at (row, col), evaluating and memoizing it on first
 // visit. A cell already on the evaluation stack is a circular reference; an
-// out-of-grid position is #REF!.
+// out-of-grid position is #REF! (memoized like any answer, so it consumes
+// budget exactly once). The admit check runs BEFORE the cell is fetched: on
+// the windowed path a fetch is real I/O into a bounded cache, and a budget
+// that only bounded computed values would leave a refused range reading and
+// caching every cell it names.
 func (c computer) read(row rowIndex, col colIndex) Value {
-	cl, inGrid := c.sheet.at(row, col)
-	if !inGrid {
-		return errorValue(ErrRef)
-	}
 	cached, phase := c.memo.lookup(row, col)
 	switch phase {
 	case phaseDone:
 		return cached
 	case phaseVisiting:
 		return errorValue(ErrCirc)
-	case phaseRefused:
-		return errorValue(ErrLimit)
 	}
 	if !c.memo.admit(row, col) {
-		return errorValue(ErrLimit)
+		return errorValue(ErrLimit) // over the touched budget: refused BEFORE any fetch
+	}
+	cl, inGrid := c.sheet.at(row, col)
+	if !inGrid {
+		c.memo.finish(row, col, errorValue(ErrRef))
+		return errorValue(ErrRef)
 	}
 	result := c.evalCell(cl).asCellResult()
 	c.memo.finish(row, col, result)

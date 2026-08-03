@@ -11,7 +11,6 @@ const (
 	phaseUnvisited cellPhase = iota
 	phaseVisiting            // on the current evaluation stack → a cycle
 	phaseDone
-	phaseRefused // sparse memo over its touched-cells budget → #LIMIT!
 )
 
 // memo is one compute pass's evaluation state: the dense form preallocates the
@@ -43,17 +42,33 @@ func newDenseMemo(s Sheet) denseMemo {
 }
 
 func (m denseMemo) lookup(row rowIndex, col colIndex) (Value, cellPhase) {
+	if !m.contains(row, col) {
+		return Value{}, phaseUnvisited
+	}
 	return m.cache[row][col], m.phase[row][col]
 }
 
 func (m denseMemo) admit(row rowIndex, col colIndex) bool {
+	if !m.contains(row, col) {
+		return true // out-of-grid: the read's own grid check answers #REF!; nothing to store
+	}
 	m.phase[row][col] = phaseVisiting
 	return true
 }
 
 func (m denseMemo) finish(row rowIndex, col colIndex, v Value) {
+	if !m.contains(row, col) {
+		return
+	}
 	m.cache[row][col] = v
 	m.phase[row][col] = phaseDone
+}
+
+// contains reports whether the slabs cover (row, col): read consults the memo
+// before the grid, so out-of-grid coordinates reach here and must answer
+// harmlessly rather than index out of range.
+func (m denseMemo) contains(row rowIndex, col colIndex) bool {
+	return row >= 0 && int(row) < len(m.phase) && col >= 0 && int(col) < len(m.phase[row])
 }
 
 // memoEntry is one sparse memo cell: its value and phase.
@@ -63,10 +78,11 @@ type memoEntry struct {
 }
 
 // sparseMemo is the windowed pass's memo: entries keyed by address, admitted
-// up to the touched-cells budget — the design's cumulative bound, so "compute
-// the visible cells" stays bounded regardless of what they reference. A cell
-// past the budget is remembered as refused, so re-reads answer #LIMIT!
-// deterministically rather than re-deciding.
+// up to the touched-cells budget — the design's cumulative bound on values,
+// memory, AND (through read's admit-before-fetch order) source I/O. Refusals
+// are not stored: the map only grows, so once it is full every later admit
+// refuses — deterministic by monotonicity, at no memory cost (the adversary's
+// M2 mutation proved a stored refusal buys nothing).
 type sparseMemo struct {
 	entries map[Address]memoEntry
 	budget  cellBudget
@@ -83,12 +99,10 @@ func (m sparseMemo) lookup(row rowIndex, col colIndex) (Value, cellPhase) {
 }
 
 func (m sparseMemo) admit(row rowIndex, col colIndex) bool {
-	at := Address{Row: int(row), Col: int(col)}
 	if cellBudget(len(m.entries)) >= m.budget {
-		m.entries[at] = memoEntry{phase: phaseRefused}
 		return false
 	}
-	m.entries[at] = memoEntry{phase: phaseVisiting}
+	m.entries[Address{Row: int(row), Col: int(col)}] = memoEntry{phase: phaseVisiting}
 	return true
 }
 

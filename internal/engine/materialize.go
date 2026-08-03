@@ -51,13 +51,17 @@ type sheetSource struct {
 	ix     index.Index
 }
 
-// newSheetSource scans src once and stands a cell reader over it.
-func newSheetSource(src readerAtSize) (sheetSource, error) {
+// newSheetSource scans src once and stands a cell reader over it, its cache
+// bounded to capacity cells: full materialization passes allCells, the
+// windowed capability passes its resident budget — the adversary's finding
+// that an unbounded windowed cache re-materializes the whole file under
+// scrolling.
+func newSheetSource(src readerAtSize, capacity index.CellCount) (sheetSource, error) {
 	ix, err := index.Scan(src.at, src.size, indexOptions())
 	if err != nil {
 		return sheetSource{}, readFailure(err)
 	}
-	reader := index.NewReader(src.at, src.size, ix, indexOptions(), allCells, parseRowCells, identityRow)
+	reader := index.NewReader(src.at, src.size, ix, indexOptions(), capacity, parseRowCells, identityRow)
 	return sheetSource{ix: ix, reader: reader}, nil
 }
 

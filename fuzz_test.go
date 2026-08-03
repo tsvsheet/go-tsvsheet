@@ -201,3 +201,65 @@ func FuzzOpenSheet(f *testing.F) {
 		}
 	})
 }
+
+// FuzzComputeRows asserts windowed evaluation over arbitrary bytes: any
+// window of a windowed document computes without panic, deterministically for
+// a fixed clock, and — under generous budgets — cell-for-cell equal to the
+// resident computation of the same document where one exists.
+func FuzzComputeRows(f *testing.F) {
+	f.Add([]byte("1\t=A1+1\n=sum(A1:B1)\n"), 0, 2)
+	f.Add([]byte("=sequence(3)\n\n\nx\n"), 0, 4)
+	f.Fuzz(func(t *testing.T, data []byte, from, n int) {
+		if n < 0 || n > 1<<12 {
+			return
+		}
+		limits := tsvsheet.DefaultLimits()
+		limits.ResidentCells = 1 // force the windowed capability
+		_, windowed, err := tsvsheet.OpenSheet(
+			tsvsheet.ByteSource{ReadAt: bytes.NewReader(data), Size: int64(len(data))}, limits)
+		if err != nil || windowed == nil {
+			return
+		}
+		opts := tsvsheet.ComputeOptions{At: fuzzClock(), Limits: tsvsheet.DefaultLimits()}
+		first, err := windowed.ComputeRows(from, n, opts)
+		if err != nil {
+			return // a legitimate refusal (e.g. a syntax error read lazily)
+		}
+		second, err := windowed.ComputeRows(from, n, opts)
+		if err != nil {
+			t.Fatalf("the same window failed on repeat: %v", err)
+		}
+		if len(first) != len(second) {
+			t.Fatal("window shape changed between identical calls")
+		}
+		parsed, parseErr := tsvsheet.Parse(data)
+		if parseErr != nil || from < 0 {
+			return
+		}
+		resident := parsed.ComputeWith(opts)
+		source, err := windowed.Rows(from, n)
+		if err != nil {
+			t.Fatalf("source rows failed where compute succeeded: %v", err)
+		}
+		for r := range first {
+			for c := range first[r] {
+				if first[r][c] != second[r][c] {
+					t.Fatalf("nondeterministic at (%d,%d): %q then %q", r, c, first[r][c], second[r][c])
+				}
+				if source[r][c] == "" {
+					continue // an empty source cell may hold a resident SPILL; windows do not spill — documented
+				}
+				rr := from + r
+				if rr < len(resident) && c < len(resident[rr]) && first[r][c] != resident[rr][c] {
+					t.Fatalf(
+						"windowed diverged from resident at (%d,%d): %q vs %q",
+						rr,
+						c,
+						first[r][c],
+						resident[rr][c],
+					)
+				}
+			}
+		}
+	})
+}
