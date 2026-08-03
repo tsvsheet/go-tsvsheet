@@ -30,8 +30,8 @@ func (s Sheet) ComputeAtTick(at time.Time, tick Tick) Grid {
 // spilling any dynamic-array results. It is the shared body of ComputeAt (plain)
 // and ComputeWith (with an embedded-sheet loader).
 func (s Sheet) computeGrid(comp computer) Grid {
-	values := make([][]Value, len(s.cells))
-	for r, row := range s.cells {
+	values := make([][]Value, s.height())
+	for r, row := range s.rowsView() {
 		values[r] = make([]Value, len(row))
 		for c, cl := range row {
 			values[r][c] = comp.cellValue(rowIndex(r), colIndex(c), cl)

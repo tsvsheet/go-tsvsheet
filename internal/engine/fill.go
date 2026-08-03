@@ -41,8 +41,8 @@ func (s Sheet) Fill(from Address, to Span) Sheet {
 	if from.Row < 0 || from.Col < 0 || span.From.Row < 0 || span.From.Col < 0 {
 		return s
 	}
-	source := lineCell(s.cells, from)
-	cells := mapRows(s.cells, cloneRow)
+	source := lineCell(s.grid(), from)
+	cells := mapRows(s.grid(), cloneRow)
 	for r := span.From.Row; r <= span.To.Row; r++ {
 		for c := span.From.Col; c <= span.To.Col; c++ {
 			cells = fillTarget(cells, source, from, Address{Row: r, Col: c})

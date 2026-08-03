@@ -22,7 +22,7 @@ type Diagnostic struct {
 // narrowed grammar admits is a valid A1 form, so Check never reports those.
 func Check(s Sheet) []Diagnostic {
 	var diags []Diagnostic
-	for r, row := range s.cells {
+	for r, row := range s.rowsView() {
 		for c, cl := range row {
 			if cl.isFormula() {
 				at := Address{Row: r, Col: c}

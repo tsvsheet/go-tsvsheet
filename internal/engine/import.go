@@ -91,7 +91,7 @@ func isImportName(name funcName) boolResult {
 func (s Sheet) HasImports() bool {
 	found := false
 	s.eachFormula(func(at Address) {
-		walkCalls(s.cells[at.Row][at.Col].formula, func(call tsvt.Call) {
+		walkCalls(s.rowsView()[at.Row][at.Col].formula, func(call tsvt.Call) {
 			if isImportName(funcName(strings.ToLower(call.Name))) {
 				found = true
 			}

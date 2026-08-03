@@ -21,7 +21,7 @@ func (s Sheet) IsVolatile() bool {
 func (s Sheet) VolatileSchedules() []string {
 	var schedules []string
 	s.eachFormula(func(at Address) {
-		walkCalls(s.cells[at.Row][at.Col].formula, func(call tsvt.Call) {
+		walkCalls(s.rowsView()[at.Row][at.Col].formula, func(call tsvt.Call) {
 			if strings.ToLower(call.Name) == fnVolatile {
 				schedules = append(schedules, volatileSchedule(call))
 			}

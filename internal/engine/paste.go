@@ -22,7 +22,7 @@ func (s Sheet) Paste(at, origin Address, block Grid, limits Limits) (Sheet, erro
 		return Sheet{}, err
 	}
 	cells, err := pasteBlockInto(
-		mapRows(s.cells, cloneRow),
+		mapRows(s.grid(), cloneRow),
 		at, origin, block, colIndex(widestBlockRow(block)),
 	)
 	if err != nil {

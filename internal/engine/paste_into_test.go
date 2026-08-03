@@ -183,13 +183,15 @@ func TestDocument_PasteIntoTilesAndGrowsLayout(t *testing.T) {
 	require.NoError(t, err)
 	got, err := doc.PasteInto(
 		engine.Span{From: engine.Address{Row: 1, Col: 0}, To: engine.Address{Row: 2, Col: 0}},
-		engine.Address{Row: 1, Col: 0}, block([]string{"x"}), engine.DefaultLimits())
+		engine.Address{Row: 1, Col: 0}, block([]string{"x"}), engine.DefaultLimits(),
+	)
 	require.NoError(t, err)
 	assert.Equal(t, "# note\n=1+1\nx\nx\n", string(got.Text()))
 
 	_, err = doc.PasteInto(
 		engine.Span{From: engine.Address{Row: 0, Col: 0}, To: engine.Address{Row: 1, Col: 0}},
-		engine.Address{Row: 0, Col: 0}, block([]string{"=("}), engine.DefaultLimits())
+		engine.Address{Row: 0, Col: 0}, block([]string{"=("}), engine.DefaultLimits(),
+	)
 	require.Error(t, err)
 	assert.Equal(t, "# note\n=1+1\n", string(doc.Text()))
 }

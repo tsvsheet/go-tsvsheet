@@ -6,16 +6,6 @@ import (
 	"github.com/tsvsheet/go-tsvsheet/internal/tsvt"
 )
 
-// cellPhase tracks a cell's evaluation state for memoization and cycle
-// detection.
-type cellPhase int
-
-const (
-	phaseUnvisited cellPhase = iota
-	phaseVisiting            // on the current evaluation stack → a cycle
-	phaseDone
-)
-
 // computer memoizes cell values as they are evaluated in dependency order. Its
 // cache and phase slices are allocated once and shared, so value-receiver
 // methods mutate them in place (no reassignment) and every recursive read sees
@@ -28,12 +18,11 @@ const (
 // ordinal read by tick()/frame().
 type computer struct {
 	now     time.Time
-	rng     passRNG
+	memo    memo
 	fetcher Fetcher
+	rng     passRNG
 	env     embedEnv
 	sheet   Sheet
-	cache   [][]Value
-	phase   [][]cellPhase
 	limits  Limits
 	tick    Tick
 }
@@ -42,14 +31,8 @@ type computer struct {
 // engine's generous DefaultLimits (the plain Compute/ComputeAt path); the
 // embedding path (ComputeWith) overrides them with the injected limits.
 func newComputer(s Sheet, now time.Time) computer {
-	cache := make([][]Value, len(s.cells))
-	phase := make([][]cellPhase, len(s.cells))
-	for r, row := range s.cells {
-		cache[r] = make([]Value, len(row))
-		phase[r] = make([]cellPhase, len(row))
-	}
 	rng := newPassRNG(prngSeed(now.UnixNano()))
-	return computer{now: now, rng: rng, sheet: s, cache: cache, phase: phase, limits: DefaultLimits()}
+	return computer{now: now, rng: rng, sheet: s, memo: newDenseMemo(s), limits: DefaultLimits()}
 }
 
 // cellValue is a cell's evaluated Value: a literal parsed, a formula computed
@@ -63,22 +46,29 @@ func (c computer) cellValue(row rowIndex, col colIndex, cl cell) Value {
 
 // read returns the value at (row, col), evaluating and memoizing it on first
 // visit. A cell already on the evaluation stack is a circular reference; an
-// out-of-grid position is #REF!.
+// out-of-grid position is #REF! (memoized like any answer, so it consumes
+// budget exactly once). The admit check runs BEFORE the cell is fetched: on
+// the windowed path a fetch is real I/O into a bounded cache, and a budget
+// that only bounded computed values would leave a refused range reading and
+// caching every cell it names.
 func (c computer) read(row rowIndex, col colIndex) Value {
-	cl, inGrid := c.sheet.at(row, col)
-	if !inGrid {
-		return errorValue(ErrRef)
-	}
-	switch c.phase[row][col] {
+	cached, phase := c.memo.lookup(row, col)
+	switch phase {
 	case phaseDone:
-		return c.cache[row][col]
+		return cached
 	case phaseVisiting:
 		return errorValue(ErrCirc)
 	}
-	c.phase[row][col] = phaseVisiting
+	if !c.memo.admit(row, col) {
+		return errorValue(ErrLimit) // over the touched budget: refused BEFORE any fetch
+	}
+	cl, inGrid := c.sheet.at(row, col)
+	if !inGrid {
+		c.memo.finish(row, col, errorValue(ErrRef))
+		return errorValue(ErrRef)
+	}
 	result := c.evalCell(cl).asCellResult()
-	c.cache[row][col] = result
-	c.phase[row][col] = phaseDone
+	c.memo.finish(row, col, result)
 	return result
 }
 

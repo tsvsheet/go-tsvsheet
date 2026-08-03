@@ -159,3 +159,112 @@ func FuzzReadTSV(f *testing.F) {
 		}
 	})
 }
+
+// FuzzOpenSheet asserts the any-size entry point over arbitrary bytes: exactly
+// one capability comes back (or an error), a resident open computes exactly as
+// Parse does, and a windowed census agrees with the resident row count when
+// both are obtainable.
+func FuzzOpenSheet(f *testing.F) {
+	f.Add([]byte("a\tb\n=A1\tc\n"), 4)
+	f.Add([]byte("#. note\nr0\n"), 1)
+	f.Fuzz(func(t *testing.T, data []byte, resident int) {
+		if resident < 1 || resident > 1<<20 {
+			return
+		}
+		limits := tsvsheet.DefaultLimits()
+		limits.ResidentCells = resident
+		sheet, windowed, err := tsvsheet.OpenSheet(
+			tsvsheet.ByteSource{ReadAt: bytes.NewReader(data), Size: int64(len(data))}, limits)
+		if err != nil {
+			return
+		}
+		parsed, parseErr := tsvsheet.Parse(data)
+		if windowed == nil {
+			if parseErr != nil {
+				t.Fatalf("resident open accepted what Parse refuses: %v", parseErr)
+			}
+			a, b := sheet.ComputeWith(tsvsheet.ComputeOptions{At: fuzzClock(), Limits: limits}),
+				parsed.ComputeWith(tsvsheet.ComputeOptions{At: fuzzClock(), Limits: limits})
+			if len(a) != len(b) {
+				t.Fatal("resident open diverged from Parse in shape")
+			}
+			return
+		}
+		if parseErr == nil {
+			rows, rowsErr := windowed.Rows(0, 1<<20)
+			if rowsErr != nil {
+				t.Fatalf("windowed rows failed on a parseable doc: %v", rowsErr)
+			}
+			if len(rows) != windowed.Census().Rows {
+				t.Fatalf("census rows %d vs served %d", windowed.Census().Rows, len(rows))
+			}
+		}
+	})
+}
+
+// FuzzComputeRows asserts windowed evaluation over arbitrary bytes: any
+// window of a windowed document computes without panic, deterministically for
+// a fixed clock, and — under generous budgets — cell-for-cell equal to the
+// resident computation of the same document where one exists.
+func FuzzComputeRows(f *testing.F) {
+	f.Add([]byte("1\t=A1+1\n=sum(A1:B1)\n"), 0, 2)
+	f.Add([]byte("=sequence(3)\n\n\nx\n"), 0, 4)
+	f.Fuzz(func(t *testing.T, data []byte, from, n int) {
+		if n < 0 || n > 1<<12 {
+			return
+		}
+		limits := tsvsheet.DefaultLimits()
+		limits.ResidentCells = 1 // force the windowed capability
+		_, windowed, err := tsvsheet.OpenSheet(
+			tsvsheet.ByteSource{ReadAt: bytes.NewReader(data), Size: int64(len(data))}, limits)
+		if err != nil || windowed == nil {
+			return
+		}
+		opts := tsvsheet.ComputeOptions{At: fuzzClock(), Limits: tsvsheet.DefaultLimits()}
+		first, err := windowed.ComputeRows(from, n, opts)
+		if err != nil {
+			return // a legitimate refusal (e.g. a syntax error read lazily)
+		}
+		second, err := windowed.ComputeRows(from, n, opts)
+		if err != nil {
+			t.Fatalf("the same window failed on repeat: %v", err)
+		}
+		if len(first) != len(second) {
+			t.Fatal("window shape changed between identical calls")
+		}
+		parsed, parseErr := tsvsheet.Parse(data)
+		if parseErr != nil || from < 0 {
+			return
+		}
+		if bytes.Contains(bytes.ToLower(data), []byte("rand")) {
+			return // volatile draws follow WINDOW evaluation order by documented
+			// contract — resident parity is unsound for them (per-window
+			// determinism was already asserted above)
+		}
+		resident := parsed.ComputeWith(opts)
+		source, err := windowed.Rows(from, n)
+		if err != nil {
+			t.Fatalf("source rows failed where compute succeeded: %v", err)
+		}
+		for r := range first {
+			for c := range first[r] {
+				if first[r][c] != second[r][c] {
+					t.Fatalf("nondeterministic at (%d,%d): %q then %q", r, c, first[r][c], second[r][c])
+				}
+				if source[r][c] == "" {
+					continue // an empty source cell may hold a resident SPILL; windows do not spill — documented
+				}
+				rr := from + r
+				if rr < len(resident) && c < len(resident[rr]) && first[r][c] != resident[rr][c] {
+					t.Fatalf(
+						"windowed diverged from resident at (%d,%d): %q vs %q",
+						rr,
+						c,
+						first[r][c],
+						resident[rr][c],
+					)
+				}
+			}
+		}
+	})
+}

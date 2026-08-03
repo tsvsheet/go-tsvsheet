@@ -231,3 +231,23 @@ type TraceImport = engine.TraceImport
 // what WriteTSV emits for that value in a computed grid. A 2-D array value
 // reduces to its scalar-context (top-left) value before formatting.
 func FormatValue(v Value) string { return engine.FormatValue(v) }
+
+// OpenSheet loads a source of any size under limits: one scan builds the
+// census, and the resident cell budget decides the capability — at or under
+// it, a fully resident Sheet identical to Parse's; over it, a WindowedSheet
+// serving bounded viewport reads while the source stays on disk (SPECIFICATION
+// §6 budgets; raise the budget to make any size resident).
+func OpenSheet(src ByteSource, limits Limits) (Sheet, *WindowedSheet, error) {
+	return engine.OpenSheet(src, limits)
+}
+
+// ByteSource is an any-size byte source — a file, a spooled stream, or
+// in-memory bytes — with its length.
+type ByteSource = engine.ByteSource
+
+// WindowedSheet is the over-budget capability: view/compute-only, serving
+// bounded row windows through the index's block cache.
+type WindowedSheet = engine.WindowedSheet
+
+// SheetCensus is what one open-time scan learned about a document.
+type SheetCensus = engine.SheetCensus

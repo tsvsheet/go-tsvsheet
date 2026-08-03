@@ -30,10 +30,10 @@ func (d Document) View() (View, []Diagnostic) {
 
 // Extent reports the grid's size, which edge-anchored items resolve against.
 func (d Document) Extent() Extent {
-	rows := len(d.sheet.cells)
+	rows := d.sheet.height()
 	cols := 0
 	if rows > 0 {
-		cols = len(d.sheet.cells[0])
+		cols = len(d.sheet.rowsView()[0])
 	}
 	return Extent{Rows: rows, Cols: cols}
 }

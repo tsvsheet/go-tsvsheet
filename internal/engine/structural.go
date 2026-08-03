@@ -30,7 +30,7 @@ func (s Sheet) InsertRow(at Address) Sheet {
 		return s
 	}
 	return rewriteAll(
-		insertLine(s.cells, rowIndex(min(at.Row, len(s.cells)))),
+		insertLine(s.grid(), rowIndex(min(at.Row, s.height()))),
 		rowAxis,
 		insertTransform(lineIndex(at.Row)),
 	)
@@ -40,10 +40,10 @@ func (s Sheet) InsertRow(at Address) Sheet {
 // #REF! and references below it shift up. An out-of-range row is a no-op. Only
 // the row coordinate of at is used.
 func (s Sheet) DeleteRow(at Address) Sheet {
-	if at.Row < 0 || at.Row >= len(s.cells) {
+	if at.Row < 0 || at.Row >= s.height() {
 		return s
 	}
-	return rewriteAll(deleteLine(s.cells, rowIndex(at.Row)), rowAxis, deleteTransform(lineIndex(at.Row)))
+	return rewriteAll(deleteLine(s.grid(), rowIndex(at.Row)), rowAxis, deleteTransform(lineIndex(at.Row)))
 }
 
 // InsertCol returns a new sheet with a blank column inserted before at.Col;
@@ -54,17 +54,17 @@ func (s Sheet) InsertCol(at Address) Sheet {
 	if at.Col < 0 {
 		return s
 	}
-	return rewriteAll(insertColumn(s.cells, colIndex(at.Col)), colAxis, insertTransform(lineIndex(at.Col)))
+	return rewriteAll(insertColumn(s.grid(), colIndex(at.Col)), colAxis, insertTransform(lineIndex(at.Col)))
 }
 
 // DeleteCol returns a new sheet with column at.Col removed; references to it
 // become #REF! and references to its right shift left. A column past every row
 // is a no-op. Only the column coordinate of at is used.
 func (s Sheet) DeleteCol(at Address) Sheet {
-	if at.Col < 0 || at.Col >= widestRow(s.cells) {
+	if at.Col < 0 || at.Col >= s.widest() {
 		return s
 	}
-	return rewriteAll(deleteColumn(s.cells, colIndex(at.Col)), colAxis, deleteTransform(lineIndex(at.Col)))
+	return rewriteAll(deleteColumn(s.grid(), colIndex(at.Col)), colAxis, deleteTransform(lineIndex(at.Col)))
 }
 
 // insertLine splices a blank row into the grid before at. The new row is a full

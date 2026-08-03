@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/tsvsheet/go-tsvsheet/internal/constants"
+	"github.com/tsvsheet/go-tsvsheet/internal/index"
 	"github.com/tsvsheet/go-tsvsheet/internal/tsvt"
 )
 
@@ -37,6 +38,7 @@ type CellInfo struct {
 
 // Sheet is a parsed spreadsheet grid of literal and formula cells.
 type Sheet struct {
+	lazy  *lazyCells // non-nil only inside a windowed evaluation (spec 016 6b)
 	cells [][]cell
 }
 
@@ -45,30 +47,18 @@ const formulaMarker = "="
 
 // Parse reads a .tsvt grid: each TAB-separated field is a literal, or — when it
 // begins with `=` — a formula compiled from the expression that follows. A
-// malformed formula is a syntax error naming its cell.
+// malformed formula is a syntax error naming its cell. The bytes are indexed
+// and read through the one materialization path every source shares (spec
+// 016).
 func Parse(src []byte) (Sheet, error) {
-	grid, err := ReadTSV(bytes.NewReader(src))
+	source, err := newSheetSource(readerAtSize{
+		at:   bytes.NewReader(src),
+		size: index.SourceSize(len(src)),
+	}, allCells)
 	if err != nil {
 		return Sheet{}, err
 	}
-	return sheetFromGrid(grid)
-}
-
-// sheetFromGrid parses every field of a raw grid into a Sheet, naming the cell
-// on a formula syntax error.
-func sheetFromGrid(grid Grid) (Sheet, error) {
-	cells := make([][]cell, len(grid))
-	for r, row := range grid {
-		cells[r] = make([]cell, len(row))
-		for c, text := range row {
-			parsed, cellErr := parseCell(textVal(text), rowIndex(r), colIndex(c))
-			if cellErr != nil {
-				return Sheet{}, cellErr
-			}
-			cells[r][c] = parsed
-		}
-	}
-	return Sheet{cells: cells}, nil
+	return materializeSheet(source)
 }
 
 // parseCell classifies a field as a literal or compiles its formula, naming the
@@ -105,8 +95,8 @@ func (s Sheet) scalarText(values [][]Value, at Address) string {
 	if at.Row >= len(values) || at.Col >= len(values[at.Row]) {
 		return ""
 	}
-	if !s.cells[at.Row][at.Col].isFormula() {
-		return s.cells[at.Row][at.Col].text
+	if cl := s.rowsView()[at.Row][at.Col]; !cl.isFormula() {
+		return cl.text
 	}
 	return values[at.Row][at.Col].String()
 }
@@ -158,18 +148,47 @@ func (s Sheet) blocksSpill(anchor, target Address) boolResult {
 }
 
 // isEmptyCell reports whether a source cell is empty (spillable): out of the
-// source grid, or a blank non-formula cell.
+// source grid, or a blank non-formula cell. It reads through at(), the one
+// seam both backings share, so spill blocking answers identically for
+// resident and windowed sheets.
 func (s Sheet) isEmptyCell(at Address) boolResult {
-	if at.Row >= len(s.cells) || at.Col >= len(s.cells[at.Row]) {
+	cl, inGrid := s.at(rowIndex(at.Row), colIndex(at.Col))
+	if !inGrid {
 		return true
 	}
-	cl := s.cells[at.Row][at.Col]
 	return boolResult(cl.text == "" && !bool(cl.isFormula()))
 }
+
+// The storage seam (spec 016 area 3): every read of the cell grid goes through
+// these accessors — height, widest, rowsView for whole-grid walks, at for one
+// cell — and every edit path materializes through grid. The accessors are what
+// the indexed backing replaces in area 4; the walks and grid are the surfaces
+// the overlay takes over in area 5. Nothing outside this seam may touch
+// s.cells.
+
+// height is the grid's row count. The lazy backing keeps at() as its only
+// read seam: whole-grid walks and the edit machinery — height's and widest's
+// callers — are foreclosed on windowed documents by the load policy, so no
+// lazy branch exists here to go stale.
+func (s Sheet) height() int { return len(s.cells) }
+
+// widest is the column count of the widest row.
+func (s Sheet) widest() int { return widestRow(s.cells) }
+
+// rowsView is the whole grid for a read-only walk (compute, check, source
+// serialization); mutation belongs to the grid accessor below.
+func (s Sheet) rowsView() [][]cell { return s.cells }
+
+// grid is the materialized edit surface: the current cells, handed to the
+// structural and fill/paste machinery that rebuilds a new grid from them.
+func (s Sheet) grid() [][]cell { return s.cells }
 
 // at returns the cell at (row, col); the boolean reports whether the position
 // is within the grid.
 func (s Sheet) at(row rowIndex, col colIndex) (cell, boolResult) {
+	if s.lazy != nil {
+		return s.lazy.at(row, col)
+	}
 	if row < 0 || int(row) >= len(s.cells) || col < 0 || int(col) >= len(s.cells[row]) {
 		return cell{}, false
 	}
@@ -180,7 +199,7 @@ func (s Sheet) at(row rowIndex, col colIndex) (cell, boolResult) {
 // order.
 func (s Sheet) Cells() []CellInfo {
 	var out []CellInfo
-	for r, row := range s.cells {
+	for r, row := range s.rowsView() {
 		for c, cl := range row {
 			if cl.text == "" {
 				continue
@@ -198,8 +217,8 @@ func (s Sheet) Cells() []CellInfo {
 // Source returns the sheet's cell source texts (literals and "=formulas") as a
 // grid — what an editor shows and what is saved back to the .tsvt file.
 func (s Sheet) Source() Grid {
-	out := make(Grid, len(s.cells))
-	for r, row := range s.cells {
+	out := make(Grid, s.height())
+	for r, row := range s.rowsView() {
 		out[r] = make([]string, len(row))
 		for c, cl := range row {
 			out[r][c] = cl.text
@@ -227,7 +246,7 @@ func (s Sheet) Set(addr Address, text string, limits Limits) (Sheet, error) {
 	if err != nil {
 		return Sheet{}, err
 	}
-	cells := growCells(s.cells, addr)
+	cells := growCells(s.grid(), addr)
 	cells[addr.Row][addr.Col] = parsed
 	return Sheet{cells: cells}, nil
 }

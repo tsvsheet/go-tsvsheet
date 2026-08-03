@@ -31,19 +31,17 @@ type Document struct {
 // physical line layout so comment and shebang lines are preserved by Text.
 func ParseDocument(src []byte) (Document, error) {
 	var layout []docLine
-	grid := Grid{}
 	err := scanLines(bytes.NewReader(src), func(text string, isComment bool) {
 		if isComment {
 			layout = append(layout, docLine{comment: text})
 			return
 		}
 		layout = append(layout, docLine{isRow: true})
-		grid = append(grid, strings.Split(text, tab))
 	})
 	if err != nil {
 		return Document{}, err
 	}
-	sheet, err := sheetFromGrid(grid)
+	sheet, err := Parse(src)
 	if err != nil {
 		return Document{}, err
 	}
@@ -80,7 +78,7 @@ func (d Document) SetCell(at Address, text string, limits Limits) (Document, err
 	if err != nil {
 		return Document{}, err
 	}
-	grown := rowIndex(len(sheet.cells) - len(d.sheet.cells))
+	grown := rowIndex(sheet.height() - d.sheet.height())
 	return Document{sheet: sheet, layout: appendMarkers(d.layout, grown)}, nil
 }
 
@@ -89,12 +87,12 @@ func (d Document) SetCell(at Address, text string, limits Limits) (Document, err
 // written in. A no-op on the sheet is a no-op on the document.
 func (d Document) InsertRow(at Address) Document {
 	sheet := d.sheet.InsertRow(at)
-	if len(sheet.cells) == len(d.sheet.cells) {
+	if sheet.height() == d.sheet.height() {
 		return d
 	}
-	moved := Document{sheet: sheet, layout: spliceMarker(d.layout, rowIndex(min(at.Row, len(d.sheet.cells))))}
+	moved := Document{sheet: sheet, layout: spliceMarker(d.layout, rowIndex(min(at.Row, d.sheet.height())))}
 	return moved.shiftDirectives(directiveEdit{
-		axis: tsvt.AxisRow, at: offsetOfRow(gridIndex(at.Row)), size: tsvt.Offset(len(d.sheet.cells)),
+		axis: tsvt.AxisRow, at: offsetOfRow(gridIndex(at.Row)), size: tsvt.Offset(d.sheet.height()),
 	})
 }
 
@@ -102,7 +100,7 @@ func (d Document) InsertRow(at Address) Document {
 // semantics); comment lines are never deleted by a row deletion.
 func (d Document) DeleteRow(at Address) Document {
 	sheet := d.sheet.DeleteRow(at)
-	if len(sheet.cells) == len(d.sheet.cells) {
+	if sheet.height() == d.sheet.height() {
 		return d
 	}
 	idx := markerIndex(d.layout, rowIndex(at.Row))
@@ -110,7 +108,7 @@ func (d Document) DeleteRow(at Address) Document {
 	layout = append(layout, d.layout[:idx]...)
 	moved := Document{sheet: sheet, layout: append(layout, d.layout[idx+1:]...)}
 	return moved.shiftDirectives(directiveEdit{
-		axis: tsvt.AxisRow, at: offsetOfRow(gridIndex(at.Row)), size: tsvt.Offset(len(d.sheet.cells)), isRemoval: true,
+		axis: tsvt.AxisRow, at: offsetOfRow(gridIndex(at.Row)), size: tsvt.Offset(d.sheet.height()), isRemoval: true,
 	})
 }
 
@@ -119,7 +117,7 @@ func (d Document) DeleteRow(at Address) Document {
 // is.
 func (d Document) Fill(from Address, to Span) Document {
 	sheet := d.sheet.Fill(from, to)
-	grown := rowIndex(len(sheet.cells) - len(d.sheet.cells))
+	grown := rowIndex(sheet.height() - d.sheet.height())
 	return Document{sheet: sheet, layout: appendMarkers(d.layout, grown)}
 }
 
@@ -132,7 +130,7 @@ func (d Document) Paste(at, origin Address, block Grid, limits Limits) (Document
 	if err != nil {
 		return Document{}, err
 	}
-	grown := rowIndex(len(sheet.cells) - len(d.sheet.cells))
+	grown := rowIndex(sheet.height() - d.sheet.height())
 	return Document{sheet: sheet, layout: appendMarkers(d.layout, grown)}, nil
 }
 
@@ -145,7 +143,7 @@ func (d Document) PasteInto(target Span, origin Address, block Grid, limits Limi
 	if err != nil {
 		return Document{}, err
 	}
-	grown := rowIndex(len(sheet.cells) - len(d.sheet.cells))
+	grown := rowIndex(sheet.height() - d.sheet.height())
 	return Document{sheet: sheet, layout: appendMarkers(d.layout, grown)}, nil
 }
 
@@ -154,7 +152,7 @@ func (d Document) PasteInto(target Span, origin Address, block Grid, limits Limi
 // written in. A no-op on the sheet is a no-op on the document.
 func (d Document) DuplicateRow(at Address) Document {
 	sheet := d.sheet.DuplicateRow(at)
-	if len(sheet.cells) == len(d.sheet.cells) {
+	if sheet.height() == d.sheet.height() {
 		return d
 	}
 	return Document{sheet: sheet, layout: spliceMarker(d.layout, rowIndex(at.Row+1))}

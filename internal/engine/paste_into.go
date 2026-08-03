@@ -39,7 +39,7 @@ func (s Sheet) pasteTiles(span Span, origin Address, block Grid, limits Limits) 
 		return Sheet{}, err
 	}
 	width := colIndex(widestBlockRow(block))
-	cells := mapRows(s.cells, cloneRow)
+	cells := mapRows(s.grid(), cloneRow)
 	for r := span.From.Row; r <= span.To.Row; r += len(block) {
 		for c := span.From.Col; c <= span.To.Col; c += int(width) {
 			var err error
