@@ -131,7 +131,6 @@ var functions = map[string]function{
 	"average": {impl: fnAvg, spec: cellsRest, minArgs: 1, maxArgs: -1},
 	"abs":     {impl: fnAbs, minArgs: 1, maxArgs: 1},
 	"round":   {impl: fnRound, minArgs: 1, maxArgs: 2},
-	"concat":  {impl: fnConcat, spec: cellsRest, minArgs: 1, maxArgs: -1},
 	"len":     {impl: fnLen, minArgs: 1, maxArgs: 1},
 	"mod":     {impl: fnMod, minArgs: 2, maxArgs: 2},
 	"output":  {impl: outputValue, minArgs: 1, maxArgs: 1},

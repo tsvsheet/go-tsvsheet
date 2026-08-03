@@ -110,19 +110,56 @@ var inspectors = map[string]func(v Value) Value{
 }
 
 // evalText dispatches the text builtins that must read an injected resource
-// limit — currently only REPT, whose result is bounded by the byte budget. ok is
-// false for any other name.
+// limit: REPT, whose count multiplies, and the two folds — CONCAT and TEXTJOIN
+// — whose operands are flattened ranges, so a whole column is one argument.
+// Each bounds its result by the byte budget rather than building it first
+// (R16: a budget binds every door, and a refusal that first allocates what it
+// refuses is no bound at all). ok is false for any other name.
 func (r resolver) evalText(name funcName, args []tsvt.Expr) (Value, boolResult) {
-	if !isText(name) {
+	switch name {
+	case "rept":
+		return r.evalRept(args), true
+	case "concat":
+		return r.evalConcat(args), true
+	case "textjoin":
+		return r.evalTextJoin(args), true
+	default:
 		return Value{}, false
 	}
-	return r.evalRept(args), true
 }
 
 // isText reports whether name is a lazily-dispatched text builtin — the set
 // evalText owns. Check consults it so the checker and the evaluator agree.
 func isText(name funcName) boolResult {
-	return name == "rept"
+	return name == "rept" || name == "concat" || name == "textjoin"
+}
+
+// evalConcat evaluates CONCAT(text…) — every operand's text, flattened ranges
+// included, joined with no separator — under the byte budget.
+func (r resolver) evalConcat(args []tsvt.Expr) Value {
+	if len(args) < 1 {
+		return errorValue(ErrValue)
+	}
+	values := r.argValues(args, cellsRest)
+	if bad, found := firstError(values); found {
+		return bad
+	}
+	return joinText(values, separator(""), skipEmpties(false), byteBudget(r.comp.limits.ResultBytes))
+}
+
+// evalTextJoin evaluates TEXTJOIN(delimiter, ignore_empty, text…) under the
+// byte budget: the leading two operands are scalars, the rest flatten.
+func (r resolver) evalTextJoin(args []tsvt.Expr) Value {
+	if len(args) < 3 {
+		return errorValue(ErrValue)
+	}
+	values := r.argValues(args, twoScalarsThenCells)
+	if bad, found := firstError(values); found {
+		return bad
+	}
+	isSkippingEmpties, _ := values[1].truthy()
+	return joinText(values[2:], separator(values[0].String()), skipEmpties(isSkippingEmpties),
+		byteBudget(r.comp.limits.ResultBytes))
 }
 
 // evalRept evaluates REPT(text, count) lazily so it can bound its result by the
