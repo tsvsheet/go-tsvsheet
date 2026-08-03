@@ -10,6 +10,7 @@ import errs "github.com/gomatic/go-error"
 // Keep these constants sorted alphabetically.
 const (
 	ErrCommentCell  errs.Const = "cell text would make the row a comment line"
+	ErrDocTooLarge  errs.Const = "document exceeds the resident cell budget"
 	ErrEditsAddress errs.Const = "invalid edits address"
 	ErrEditsApply   errs.Const = "edits op refused"
 	ErrEditsArity   errs.Const = "wrong edits argument count"

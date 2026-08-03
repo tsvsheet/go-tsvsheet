@@ -15,6 +15,13 @@ type Document = engine.Document
 // physical line layout so comment and shebang lines are preserved by Text.
 func ParseDocument(src []byte) (Document, error) { return engine.ParseDocument(src) }
 
+// ParseDocumentWith is ParseDocument under the same residency budget as
+// ParseWith (spec 018): an over-resident document refuses with ErrDocTooLarge
+// before the layout or any cell materializes.
+func ParseDocumentWith(src []byte, limits Limits) (Document, error) {
+	return engine.ParseDocumentWith(src, limits)
+}
+
 // View is what a viewport does with a grid, as the sheet's own `#.` directives
 // declare it: which rows and columns are hidden, carry headers, or stay
 // anchored while the rest scrolls. Every field is a set of 1-based positions,

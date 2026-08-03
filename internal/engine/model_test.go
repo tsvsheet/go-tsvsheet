@@ -1,6 +1,7 @@
 package engine_test
 
 import (
+	"bytes"
 	"strings"
 	"testing"
 
@@ -146,4 +147,52 @@ func TestParseMapsScanFailuresToErrReadInput(t *testing.T) {
 	require.Error(t, err)
 	assert.ErrorIs(t, err, constants.ErrReadInput)
 	assert.ErrorIs(t, err, index.ErrScan, "the scan cause survives the mapping")
+}
+
+// TestParseWithRefusesOverBudgetBeforeAnyCellParses pins the 018 census gate
+// with its own discriminator: the over-budget document carries a MALFORMED
+// formula, and the refusal is ErrDocTooLarge — not ErrSyntax — because the
+// gate reads bytes, never cells; nothing materialized. The refusal names the
+// census and the budget.
+func TestParseWithRefusesOverBudgetBeforeAnyCellParses(t *testing.T) {
+	t.Parallel()
+
+	src := []byte("a\tb\n=)(malformed\td\n")
+	_, err := engine.ParseWith(src, engine.Limits{ResidentCells: 3})
+	require.ErrorIs(t, err, constants.ErrDocTooLarge)
+	assert.NotErrorIs(t, err, constants.ErrSyntax, "the gate must precede cell parsing")
+	assert.Contains(t, err.Error(), "cells", "the refusal names the census")
+
+	_, err = engine.Parse(src)
+	assert.ErrorIs(t, err, constants.ErrSyntax, "unbounded Parse still reaches the malformed cell")
+}
+
+// TestParseWithBoundaryMatchesParse pins the exact ceiling: a document AT the
+// resident budget parses byte-identically to Parse; one cell over refuses.
+func TestParseWithBoundaryMatchesParse(t *testing.T) {
+	t.Parallel()
+
+	src := []byte("a\tb\nc\td\n") // 4 cells
+	bounded, err := engine.ParseWith(src, engine.Limits{ResidentCells: 4})
+	require.NoError(t, err)
+	unbounded, err := engine.Parse(src)
+	require.NoError(t, err)
+	assert.Equal(t, unbounded.Source(), bounded.Source(), "at the budget the bounded parse is Parse")
+
+	_, err = engine.ParseWith(src, engine.Limits{ResidentCells: 3})
+	assert.ErrorIs(t, err, constants.ErrDocTooLarge, "one cell over refuses")
+
+	_, err = engine.ParseWith(src, engine.Limits{})
+	require.NoError(t, err, "the zero value falls back to DefaultLimits, not refuse-everything")
+}
+
+// TestParseWithMapsScanFailures pins the gate's failure path: a source the
+// scanner itself refuses (a line past the ceiling) is ErrReadInput, exactly
+// as Parse reports it.
+func TestParseWithMapsScanFailures(t *testing.T) {
+	t.Parallel()
+
+	long := append(bytes.Repeat([]byte{'a'}, (1<<20)+2), '\n')
+	_, err := engine.ParseWith(long, engine.Limits{ResidentCells: 100})
+	assert.ErrorIs(t, err, constants.ErrReadInput)
 }
