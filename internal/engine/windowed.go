@@ -80,3 +80,79 @@ func (w WindowedSheet) Rows(from, n int) (Grid, error) {
 	}
 	return out, nil
 }
+
+// lazyCells reads cells on demand through the block reader for a windowed
+// evaluation, latching the first source failure behind a shared pointer: a
+// read that fails answers out-of-grid to keep evaluation total, and the
+// latched error fails the whole ComputeRows call afterwards — a broken source
+// is an error, never wrong data (pinned by
+// TestLazyCellsNeverServeWrongDataAfterAFailure).
+type lazyCells struct {
+	fail   *error
+	source sheetSource
+}
+
+// newLazyCells stands a lazy backing with a fresh latch.
+func newLazyCells(source sheetSource) lazyCells {
+	return lazyCells{fail: new(error), source: source}
+}
+
+// at reads one cell through the block cache.
+func (l lazyCells) at(row rowIndex, col colIndex) (cell, boolResult) {
+	if *l.fail != nil || row < 0 || col < 0 {
+		return cell{}, false
+	}
+	rows, err := l.source.reader.ReadRows(index.GridRow(row), 1)
+	if err != nil {
+		*l.fail = err
+		return cell{}, false
+	}
+	if len(rows) == 0 || int(col) >= len(rows[0]) {
+		return cell{}, false
+	}
+	return rows[0][col], true
+}
+
+// ComputeRows evaluates the window [from, from+n): literals as their values,
+// formulas through the one resolver over a sparse memo bounded by the
+// touched-cells budget — the design's cumulative bound, so computing the
+// visible rows stays bounded regardless of what they reference; past the
+// budget a cell answers #LIMIT!. An array-producing formula renders its
+// top-left value (windows do not spill). A source failure during evaluation
+// fails the call as ErrReadInput rather than serving partial data.
+func (w WindowedSheet) ComputeRows(from, n int, opts ComputeOptions) (Grid, error) {
+	rows, err := w.source.reader.ReadRows(index.GridRow(from), index.RowCount(n))
+	if err != nil {
+		return nil, readFailure(err)
+	}
+	lazy := newLazyCells(w.source)
+	comp := lazy.computer(effectiveLimits(w.limits), opts)
+	out := make(Grid, len(rows))
+	for r, row := range rows {
+		out[r] = make([]string, len(row))
+		for c, cl := range row {
+			out[r][c] = comp.cellValue(rowIndex(from+r), colIndex(c), cl).String()
+		}
+	}
+	if *lazy.fail != nil {
+		return nil, readFailure(*lazy.fail)
+	}
+	return out, nil
+}
+
+// computer builds the sparse-memo computer a window evaluates under this lazy
+// backing: the touched-cells budget and the pass clock/limits the options
+// carry; every value copy shares the latch through its pointer. Constructed
+// directly — newComputer's dense memo sizes slabs by the grid height, which on
+// a windowed document is the very allocation this path exists to avoid.
+func (l lazyCells) computer(limits Limits, opts ComputeOptions) computer {
+	return computer{
+		now:     opts.At,
+		rng:     newPassRNG(prngSeed(opts.At.UnixNano())),
+		sheet:   Sheet{lazy: &l},
+		memo:    newSparseMemo(limits.touchedBudget()),
+		limits:  limits,
+		fetcher: opts.Fetcher,
+		tick:    opts.Tick,
+	}
+}

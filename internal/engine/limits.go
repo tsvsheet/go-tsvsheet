@@ -17,6 +17,7 @@ type Limits struct {
 	ResultBytes   int // bytes in one string formula result (e.g. REPT)
 	SpanCells     int // cells one written reference's rectangle may cover; 0 falls back to ResultCells
 	ResidentCells int // cells a document may hold and still load fully resident (editable); 0 falls back to ResultCells
+	TouchedCells  int // distinct cells one windowed evaluation may visit across its dependency walks; 0 falls back to ResultCells
 }
 
 // DefaultLimits are generous for real spreadsheets while still bounding OOM.
@@ -27,6 +28,7 @@ func DefaultLimits() Limits {
 		ResultBytes:   1 << 20,
 		SpanCells:     5_000_000,
 		ResidentCells: 5_000_000,
+		TouchedCells:  5_000_000,
 	}
 }
 
@@ -43,6 +45,7 @@ func BrowserLimits() Limits {
 		ResultBytes:   64 << 10,
 		SpanCells:     1_000_000,
 		ResidentCells: 100_000,
+		TouchedCells:  100_000,
 	}
 }
 
@@ -70,6 +73,16 @@ func (l Limits) spanBudget() cellBudget {
 func (l Limits) residentBudget() cellBudget {
 	if l.ResidentCells > 0 {
 		return cellBudget(l.ResidentCells)
+	}
+	return cellBudget(l.ResultCells)
+}
+
+// touchedBudget is the distinct-cell ceiling for one windowed evaluation: the
+// dedicated TouchedCells when positive, else ResultCells — the family's
+// single-ceiling fallback.
+func (l Limits) touchedBudget() cellBudget {
+	if l.TouchedCells > 0 {
+		return cellBudget(l.TouchedCells)
 	}
 	return cellBudget(l.ResultCells)
 }

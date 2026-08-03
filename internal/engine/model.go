@@ -38,6 +38,7 @@ type CellInfo struct {
 
 // Sheet is a parsed spreadsheet grid of literal and formula cells.
 type Sheet struct {
+	lazy  *lazyCells // non-nil only inside a windowed evaluation (spec 016 6b)
 	cells [][]cell
 }
 
@@ -163,7 +164,10 @@ func (s Sheet) isEmptyCell(at Address) boolResult {
 // the overlay takes over in area 5. Nothing outside this seam may touch
 // s.cells.
 
-// height is the grid's row count.
+// height is the grid's row count. The lazy backing keeps at() as its only
+// read seam: whole-grid walks and the edit machinery — height's and widest's
+// callers — are foreclosed on windowed documents by the load policy, so no
+// lazy branch exists here to go stale.
 func (s Sheet) height() int { return len(s.cells) }
 
 // widest is the column count of the widest row.
@@ -180,6 +184,9 @@ func (s Sheet) grid() [][]cell { return s.cells }
 // at returns the cell at (row, col); the boolean reports whether the position
 // is within the grid.
 func (s Sheet) at(row rowIndex, col colIndex) (cell, boolResult) {
+	if s.lazy != nil {
+		return s.lazy.at(row, col)
+	}
 	if row < 0 || int(row) >= len(s.cells) || col < 0 || int(col) >= len(s.cells[row]) {
 		return cell{}, false
 	}
