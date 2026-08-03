@@ -75,7 +75,7 @@ func TestRecencyPromotionDecidesWhoSurvivesEviction(t *testing.T) {
 	opts := index.Options{Stride: 2, Split: splitTerminators, IsComment: isComment, MaxLineBytes: 1 << 20}
 	ix, err := index.Scan(strings.NewReader(string(src.data)), index.SourceSize(len(src.data)), opts)
 	require.NoError(t, err)
-	r := index.NewReader(src, index.SourceSize(len(src.data)), ix, opts, 4) // two blocks
+	r := index.NewRowReader(src, index.SourceSize(len(src.data)), ix, opts, 4) // two blocks
 
 	mustRead := func(row index.GridRow) {
 		_, readErr := r.ReadRows(row, 2)

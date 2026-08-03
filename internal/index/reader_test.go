@@ -36,7 +36,7 @@ func splitAll(src string) []string {
 }
 
 // reader builds a Reader over src with the test rules.
-func reader(t *testing.T, src string, stride int, capacity index.CellCount) *index.Reader {
+func reader(t *testing.T, src string, stride int, capacity index.CellCount) *index.Reader[[]string] {
 	t.Helper()
 	opts := index.Options{
 		Stride:       index.StrideLines(stride),
@@ -46,7 +46,7 @@ func reader(t *testing.T, src string, stride int, capacity index.CellCount) *ind
 	}
 	ix, err := index.Scan(strings.NewReader(src), index.SourceSize(len(src)), opts)
 	require.NoError(t, err)
-	return index.NewReader(strings.NewReader(src), index.SourceSize(len(src)), ix, opts, capacity)
+	return index.NewRowReader(strings.NewReader(src), index.SourceSize(len(src)), ix, opts, capacity)
 }
 
 // TestReadRowsMatchesTheOracleForEveryWindow sweeps every (from, n) window of
@@ -104,8 +104,8 @@ func TestReadRowsAgreesUnderADribblingReader(t *testing.T) {
 			opts := index.Options{Stride: 2, Split: splitTerminators, IsComment: isComment, MaxLineBytes: 1 << 20}
 			ix, err := index.Scan(strings.NewReader(src), index.SourceSize(len(src)), opts)
 			require.NoError(t, err)
-			whole := index.NewReader(strings.NewReader(src), index.SourceSize(len(src)), ix, opts, 1<<20)
-			dribbled := index.NewReader(dribblingAt{data: []byte(src)}, index.SourceSize(len(src)), ix, opts, 1<<20)
+			whole := index.NewRowReader(strings.NewReader(src), index.SourceSize(len(src)), ix, opts, 1<<20)
+			dribbled := index.NewRowReader(dribblingAt{data: []byte(src)}, index.SourceSize(len(src)), ix, opts, 1<<20)
 			wantRows, err := whole.ReadRows(0, 1<<20)
 			require.NoError(t, err)
 			gotRows, err := dribbled.ReadRows(0, 1<<20)
@@ -172,7 +172,7 @@ func TestReadRowsRefusesASourceThatNoLongerMatchesTheIndex(t *testing.T) {
 	opts := index.Options{Stride: 2, Split: splitTerminators, IsComment: isComment, MaxLineBytes: 1 << 20}
 	ix, err := index.Scan(strings.NewReader(indexed), index.SourceSize(len(indexed)), opts)
 	require.NoError(t, err)
-	r := index.NewReader(strings.NewReader(edited), index.SourceSize(len(edited)), ix, opts, 1<<20)
+	r := index.NewRowReader(strings.NewReader(edited), index.SourceSize(len(edited)), ix, opts, 1<<20)
 	_, err = r.ReadRows(2, 1)
 	assert.ErrorIs(t, err, index.ErrScan)
 }
@@ -187,7 +187,7 @@ func TestReadRowsRefusalsSurfaceErrScan(t *testing.T) {
 	ix, err := index.Scan(strings.NewReader(good), index.SourceSize(len(good)), opts)
 	require.NoError(t, err)
 
-	failing := index.NewReader(failingReader{prefix: []byte("a\nb\n")}, index.SourceSize(len(good)), ix, opts, 1<<20)
+	failing := index.NewRowReader(failingReader{prefix: []byte("a\nb\n")}, index.SourceSize(len(good)), ix, opts, 1<<20)
 	_, err = failing.ReadRows(6, 2)
 	assert.ErrorIs(t, err, index.ErrScan)
 }
@@ -202,7 +202,7 @@ func TestReaderAppliesTheOptionDefaults(t *testing.T) {
 	opts := index.Options{Split: splitTerminators, IsComment: isComment}
 	ix, err := index.Scan(strings.NewReader(src), index.SourceSize(len(src)), opts)
 	require.NoError(t, err)
-	r := index.NewReader(strings.NewReader(src), index.SourceSize(len(src)), ix, opts, 1<<20)
+	r := index.NewRowReader(strings.NewReader(src), index.SourceSize(len(src)), ix, opts, 1<<20)
 	got, err := r.ReadRows(0, 10)
 	require.NoError(t, err)
 	assert.Equal(t, gridOracle(src), got)
@@ -225,8 +225,41 @@ func TestScanBlockCarriesTheExactPhysicalLine(t *testing.T) {
 	opts := index.Options{Stride: 2, Split: splitTerminators, IsComment: lineThree, MaxLineBytes: 1 << 20}
 	ix, err := index.Scan(strings.NewReader(src), index.SourceSize(len(src)), opts)
 	require.NoError(t, err)
-	r := index.NewReader(strings.NewReader(src), index.SourceSize(len(src)), ix, opts, 1<<20)
+	r := index.NewRowReader(strings.NewReader(src), index.SourceSize(len(src)), ix, opts, 1<<20)
 	got, err := r.ReadRows(0, 10)
 	require.NoError(t, err)
 	assert.Equal(t, [][]string{{"a"}, {"b"}, {"%data"}, {"c"}}, got)
+}
+
+// errRow is the test's own sentinel for RowParse failures.
+var errRow = assert.AnError
+
+// TestParsedReaderPropagatesRowParseErrorsVerbatim pins the generic reader
+// with a non-string row type: RowParse's value comes back through an identity
+// clone (an immutable parsed row shares nothing with the cache), and its error
+// surfaces verbatim — the caller's own, not wrapped into ErrScan.
+func TestParsedReaderPropagatesRowParseErrorsVerbatim(t *testing.T) {
+	t.Parallel()
+
+	src := "1\n2\nboom\n4\n"
+	opts := index.Options{Stride: 2, Split: splitTerminators, IsComment: isComment, MaxLineBytes: 1 << 20}
+	ix, err := index.Scan(strings.NewReader(src), index.SourceSize(len(src)), opts)
+	require.NoError(t, err)
+	widths := index.NewReader(strings.NewReader(src), index.SourceSize(len(src)), ix, opts, 1<<20,
+		func(_ index.GridRow, fields []string) (int, error) {
+			if fields[0] == "boom" {
+				return 0, errRow
+			}
+			return len(fields[0]), nil
+		},
+		func(n int) int { return n },
+	)
+
+	got, err := widths.ReadRows(0, 2)
+	require.NoError(t, err)
+	assert.Equal(t, []int{1, 1}, got)
+
+	_, err = widths.ReadRows(2, 1)
+	assert.ErrorIs(t, err, errRow, "the parse error is the caller's own")
+	assert.NotErrorIs(t, err, index.ErrScan, "and is not laundered into a scan failure")
 }
