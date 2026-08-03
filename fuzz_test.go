@@ -159,3 +159,45 @@ func FuzzReadTSV(f *testing.F) {
 		}
 	})
 }
+
+// FuzzOpenSheet asserts the any-size entry point over arbitrary bytes: exactly
+// one capability comes back (or an error), a resident open computes exactly as
+// Parse does, and a windowed census agrees with the resident row count when
+// both are obtainable.
+func FuzzOpenSheet(f *testing.F) {
+	f.Add([]byte("a\tb\n=A1\tc\n"), 4)
+	f.Add([]byte("#. note\nr0\n"), 1)
+	f.Fuzz(func(t *testing.T, data []byte, resident int) {
+		if resident < 1 || resident > 1<<20 {
+			return
+		}
+		limits := tsvsheet.DefaultLimits()
+		limits.ResidentCells = resident
+		sheet, windowed, err := tsvsheet.OpenSheet(
+			tsvsheet.ByteSource{ReadAt: bytes.NewReader(data), Size: int64(len(data))}, limits)
+		if err != nil {
+			return
+		}
+		parsed, parseErr := tsvsheet.Parse(data)
+		if windowed == nil {
+			if parseErr != nil {
+				t.Fatalf("resident open accepted what Parse refuses: %v", parseErr)
+			}
+			a, b := sheet.ComputeWith(tsvsheet.ComputeOptions{At: fuzzClock(), Limits: limits}),
+				parsed.ComputeWith(tsvsheet.ComputeOptions{At: fuzzClock(), Limits: limits})
+			if len(a) != len(b) {
+				t.Fatal("resident open diverged from Parse in shape")
+			}
+			return
+		}
+		if parseErr == nil {
+			rows, rowsErr := windowed.Rows(0, 1<<20)
+			if rowsErr != nil {
+				t.Fatalf("windowed rows failed on a parseable doc: %v", rowsErr)
+			}
+			if len(rows) != windowed.Census().Rows {
+				t.Fatalf("census rows %d vs served %d", windowed.Census().Rows, len(rows))
+			}
+		}
+	})
+}

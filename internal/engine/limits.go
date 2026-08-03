@@ -12,15 +12,22 @@ import "math"
 
 // Limits bounds the sizes an untrusted sheet may drive an allocation to.
 type Limits struct {
-	ResultCells int // cells in one array formula result (e.g. SEQUENCE)
-	GridDim     int // the highest row or column index the grid may grow to (Set)
-	ResultBytes int // bytes in one string formula result (e.g. REPT)
-	SpanCells   int // cells one written reference's rectangle may cover; 0 falls back to ResultCells
+	ResultCells   int // cells in one array formula result (e.g. SEQUENCE)
+	GridDim       int // the highest row or column index the grid may grow to (Set)
+	ResultBytes   int // bytes in one string formula result (e.g. REPT)
+	SpanCells     int // cells one written reference's rectangle may cover; 0 falls back to ResultCells
+	ResidentCells int // cells a document may hold and still load fully resident (editable); 0 falls back to ResultCells
 }
 
 // DefaultLimits are generous for real spreadsheets while still bounding OOM.
 func DefaultLimits() Limits {
-	return Limits{ResultCells: 5_000_000, GridDim: 1_000_000, ResultBytes: 1 << 20, SpanCells: 5_000_000}
+	return Limits{
+		ResultCells:   5_000_000,
+		GridDim:       1_000_000,
+		ResultBytes:   1 << 20,
+		SpanCells:     5_000_000,
+		ResidentCells: 5_000_000,
+	}
 }
 
 // BrowserLimits are the tighter ceilings the WASM build applies, sized for a
@@ -30,7 +37,13 @@ func DefaultLimits() Limits {
 // RESULT (a SEQUENCE spill) writes that many new cells — the two budgets bound
 // different costs and must not share a ceiling.
 func BrowserLimits() Limits {
-	return Limits{ResultCells: 100_000, GridDim: 20_000, ResultBytes: 64 << 10, SpanCells: 1_000_000}
+	return Limits{
+		ResultCells:   100_000,
+		GridDim:       20_000,
+		ResultBytes:   64 << 10,
+		SpanCells:     1_000_000,
+		ResidentCells: 100_000,
+	}
 }
 
 // cellBudget is a ceiling on the cells a rectangle may cover, in whichever
@@ -45,6 +58,18 @@ type cellBudget int64
 func (l Limits) spanBudget() cellBudget {
 	if l.SpanCells > 0 {
 		return cellBudget(l.SpanCells)
+	}
+	return cellBudget(l.ResultCells)
+}
+
+// residentBudget is the cell count at or under which a document loads fully
+// resident: the dedicated ResidentCells when positive, else ResultCells — the
+// same single-ceiling fallback SpanCells applies, so a --max-cells constructor
+// keeps its intent. A zero or negative ResidentCells is "unset", not a
+// refuse-everything threshold.
+func (l Limits) residentBudget() cellBudget {
+	if l.ResidentCells > 0 {
+		return cellBudget(l.ResidentCells)
 	}
 	return cellBudget(l.ResultCells)
 }
