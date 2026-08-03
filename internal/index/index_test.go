@@ -143,6 +143,7 @@ var corpus = map[string]string{
 	"empty lines":       "\n\n\n",
 	"comment only":      "#. nothing else\n",
 	"wide then narrow":  "a\tb\tc\td\te\nf\n",
+	"tall":              "r0\nr1\n#. mid\nr2\nr3\nr4\nr5\nr6\nr7\nr8\nr9\n",
 }
 
 func TestScanCensusMatchesTheOracle(t *testing.T) {
@@ -153,6 +154,26 @@ func TestScanCensusMatchesTheOracle(t *testing.T) {
 			t.Run(name+"/stride", func(t *testing.T) {
 				t.Parallel()
 				assert.Equal(t, oracle(t, src).census, scan(t, src, stride).Census(),
+					"src=%q stride=%d", src, stride)
+			})
+		}
+	}
+}
+
+// TestCheckpointsHoldExactlyOnePerStartedStride pins the index's density — the
+// memory bound striding exists for: one checkpoint per started stride of data
+// rows, no more (a missed sinceMark reset checkpoints every row past the
+// first stride) and no fewer (a doubled stride halves reachability).
+func TestCheckpointsHoldExactlyOnePerStartedStride(t *testing.T) {
+	t.Parallel()
+
+	for name, src := range corpus {
+		for _, stride := range []int{1, 2, 3, 64} {
+			t.Run(name, func(t *testing.T) {
+				t.Parallel()
+				truth := oracle(t, src)
+				ix := scan(t, src, stride)
+				assert.Equal(t, (truth.census.Rows+stride-1)/stride, ix.Checkpoints(),
 					"src=%q stride=%d", src, stride)
 			})
 		}
@@ -204,6 +225,7 @@ func TestScanRefusesAnOverlongLine(t *testing.T) {
 		MaxLineBytes: 16,
 	})
 	assert.ErrorIs(t, err, index.ErrScan)
+	assert.ErrorIs(t, err, bufio.ErrTooLong, "the cause survives the sentinel wrap")
 }
 
 // TestScanRefusesEachMissingRuleAlone pins the requirement one rule at a time:

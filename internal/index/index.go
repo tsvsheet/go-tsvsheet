@@ -106,6 +106,11 @@ type Index struct {
 // Census returns the document's totals.
 func (ix Index) Census() Census { return ix.census }
 
+// Checkpoints reports the stride table's length — the index's memory, which
+// striding exists to bound: one checkpoint per started stride of data rows
+// (pinned by TestCheckpointsHoldExactlyOnePerStartedStride).
+func (ix Index) Checkpoints() int { return len(ix.stride) }
+
 // Locate returns the last checkpoint at or before row — the seek target from
 // which forward scanning reaches the row within one stride. ok is false for a
 // row past the grid.
@@ -171,16 +176,17 @@ type isEOF bool
 
 // checkedSplit runs the injected Split and refuses its two defect shapes: the
 // chunk-dependent skip form (advance without a token — bufio silently drops
-// the remainder at EOF), and a token without progress (an unbounded loop
-// otherwise). Each surfaces as ErrScan, never as a wrong index or a hang
-// (pinned by TestCheckedSplitNeverAdmitsADefectiveRule).
+// the remainder at EOF), and a token without progress, at EOF included (bufio
+// panics after a hundred of those). Each surfaces as ErrScan — pinned by
+// TestCheckedSplitNeverAdmitsADefectiveRule. bufio's ErrFinalToken form
+// passes through on the error branch.
 func checkedSplit(split bufio.SplitFunc, data []byte, isAtEnd isEOF) (int, []byte, error) {
 	advanced, token, err := split(data, bool(isAtEnd))
 	switch {
 	case err != nil:
 	case token == nil && advanced > 0:
 		return 0, nil, ErrScan.With(nil, "reason", "skip-form Split is unsupported")
-	case token != nil && advanced == 0 && !bool(isAtEnd):
+	case token != nil && advanced == 0:
 		return 0, nil, ErrScan.With(nil, "reason", "Split returned a token without consuming input")
 	}
 	return advanced, token, err

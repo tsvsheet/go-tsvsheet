@@ -33,16 +33,11 @@ type Reader struct {
 	cached   CellCount
 }
 
-// block is one cached run of rows starting at a checkpoint.
-type block struct {
-	rows  [][]string
-	start GridRow
-	cells CellCount
-}
-
-// NewReader builds a Reader over src using ix (which must have been scanned
-// from the same bytes with the same opts) and a cache bounded to capacity
-// cells.
+// NewReader builds a Reader; ix is expected to have been scanned from the
+// same bytes with the same opts (a source that has since changed surfaces as
+// ErrScan when a block fails to cover its indexed rows). A capacity at or
+// below zero degrades to a single resident block — the one being read; the
+// eviction contract lives in cache.go.
 func NewReader(src io.ReaderAt, size SourceSize, ix Index, opts Options, capacity CellCount) *Reader {
 	return &Reader{
 		src: src, size: size, ix: ix, opts: opts, capacity: capacity,
@@ -50,62 +45,57 @@ func NewReader(src io.ReaderAt, size SourceSize, ix Index, opts Options, capacit
 	}
 }
 
-// CachedCells reports the cells currently resident — the number the capacity
-// bounds.
-func (r *Reader) CachedCells() CellCount {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	return r.cached
-}
-
-// ReadRows returns rows [from, from+n), clipped at the grid's end; a window
-// past the grid is empty. A source failure surfaces as ErrScan.
+// ReadRows returns the intersection of the window [from, from+n) with the
+// grid — clipped on BOTH ends, so a negative start, a negative count, or a
+// window past the grid is simply a smaller (possibly empty) result, never a
+// panic or an oversized allocation. The returned rows are the caller's own
+// copies: no later read, eviction, or caller write can alter them. A source
+// failure — including a source whose bytes no longer match the index, which
+// shows up as a block unable to cover its promised rows — surfaces as ErrScan.
 func (r *Reader) ReadRows(from GridRow, n RowCount) ([][]string, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	out := make([][]string, 0, n)
-	row := from
-	for RowCount(len(out)) < n && int(row) < r.ix.Census().Rows {
+	row, end := clipWindow(from, n, RowCount(r.ix.Census().Rows))
+	if row >= end {
+		return nil, nil
+	}
+	out := make([][]string, 0, int(end-row))
+	for row < end {
 		b, err := r.block(row)
 		if err != nil {
 			return nil, err
 		}
-		for i := int(row - b.start); i < len(b.rows) && RowCount(len(out)) < n; i++ {
-			out = append(out, b.rows[i])
-			row++
+		copied := copyRows(*b, row, end)
+		if len(copied) == 0 {
+			return nil, ErrScan.With(nil,
+				"reason", "block cannot cover its indexed rows; the source no longer matches the index",
+				"row", int(row))
 		}
+		out = append(out, copied...)
+		row += GridRow(len(copied))
 	}
 	return out, nil
 }
 
-// block returns the cached block holding row, scanning it in on a miss and
-// evicting least-recent blocks past the capacity.
-func (r *Reader) block(row GridRow) (*block, error) {
-	cp, _ := r.ix.Locate(row) // row < Rows is the caller's loop guard
-	if el, ok := r.blocks[cp.Row]; ok {
-		r.order.MoveToFront(el)
-		return el.Value.(*block), nil
+// clipWindow intersects [from, from+n) with [0, rows).
+func clipWindow(from GridRow, n, rows RowCount) (GridRow, GridRow) {
+	start := max(from, 0)
+	if n <= 0 || RowCount(start) >= rows {
+		return start, start
 	}
-	loaded, err := r.scanBlock(cp)
-	if err != nil {
-		return nil, err
-	}
-	r.blocks[cp.Row] = r.order.PushFront(loaded)
-	r.cached += loaded.cells
-	r.evict()
-	return loaded, nil
+	end := GridRow(min(int64(start)+int64(n), int64(rows)))
+	return start, end
 }
 
-// evict drops least-recent blocks until the cache is within capacity, always
-// keeping the most recent block resident — it is the one being read.
-func (r *Reader) evict() {
-	for r.cached > r.capacity && r.order.Len() > 1 {
-		el := r.order.Back()
-		dropped := el.Value.(*block)
-		r.order.Remove(el)
-		delete(r.blocks, dropped.start)
-		r.cached -= dropped.cells
+// copyRows copies the block's rows covering [row, end) — caller-owned copies,
+// so no eviction, rescan, or caller write can reach cache memory.
+func copyRows(b block, row, end GridRow) [][]string {
+	var out [][]string
+	for i := int(row - b.start); i >= 0 && i < len(b.rows) && row < end; i++ {
+		out = append(out, append([]string(nil), b.rows[i]...))
+		row++
 	}
+	return out
 }
 
 // scanBlock reads one block's rows from the checkpoint's byte offset: at most
