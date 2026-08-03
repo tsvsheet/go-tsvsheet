@@ -42,9 +42,9 @@ type computer struct {
 // engine's generous DefaultLimits (the plain Compute/ComputeAt path); the
 // embedding path (ComputeWith) overrides them with the injected limits.
 func newComputer(s Sheet, now time.Time) computer {
-	cache := make([][]Value, len(s.cells))
-	phase := make([][]cellPhase, len(s.cells))
-	for r, row := range s.cells {
+	cache := make([][]Value, s.height())
+	phase := make([][]cellPhase, s.height())
+	for r, row := range s.rowsView() {
 		cache[r] = make([]Value, len(row))
 		phase[r] = make([]cellPhase, len(row))
 	}

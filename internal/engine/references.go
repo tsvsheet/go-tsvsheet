@@ -81,7 +81,7 @@ func covers(spans []Span, at Address) boolResult {
 
 // eachFormula visits the address of every formula cell in row-major order.
 func (s Sheet) eachFormula(visit func(Address)) {
-	for r, row := range s.cells {
+	for r, row := range s.rowsView() {
 		for c, cl := range row {
 			if cl.isFormula() {
 				visit(Address{Row: r, Col: c})

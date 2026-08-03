@@ -13,10 +13,10 @@ package engine
 // (pins hold). The duplicate keeps the source row's exact width. An
 // out-of-range row is a no-op. Only the row coordinate of at is used.
 func (s Sheet) DuplicateRow(at Address) Sheet {
-	if at.Row < 0 || at.Row >= len(s.cells) {
+	if at.Row < 0 || at.Row >= s.height() {
 		return s
 	}
-	cells := mapRows(s.InsertRow(Address{Row: at.Row + 1}).cells, cloneRow)
+	cells := mapRows(s.InsertRow(Address{Row: at.Row + 1}).grid(), cloneRow)
 	cells[at.Row+1] = rebaseLine(cells[at.Row], offset{rows: 1})
 	return Sheet{cells: cells}
 }
@@ -28,10 +28,10 @@ func (s Sheet) DuplicateRow(at Address) Sheet {
 // untouched, mirroring InsertCol. An out-of-range column is a no-op. Only the
 // column coordinate of at is used.
 func (s Sheet) DuplicateCol(at Address) Sheet {
-	if at.Col < 0 || at.Col >= widestRow(s.cells) {
+	if at.Col < 0 || at.Col >= s.widest() {
 		return s
 	}
-	return Sheet{cells: mapRows(s.InsertCol(Address{Col: at.Col + 1}).cells, func(row []cell) []cell {
+	return Sheet{cells: mapRows(s.InsertCol(Address{Col: at.Col + 1}).grid(), func(row []cell) []cell {
 		return duplicateInto(cloneRow(row), colIndex(at.Col))
 	})}
 }

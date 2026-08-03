@@ -105,8 +105,8 @@ func (s Sheet) scalarText(values [][]Value, at Address) string {
 	if at.Row >= len(values) || at.Col >= len(values[at.Row]) {
 		return ""
 	}
-	if !s.cells[at.Row][at.Col].isFormula() {
-		return s.cells[at.Row][at.Col].text
+	if cl := s.rowsView()[at.Row][at.Col]; !cl.isFormula() {
+		return cl.text
 	}
 	return values[at.Row][at.Col].String()
 }
@@ -160,12 +160,33 @@ func (s Sheet) blocksSpill(anchor, target Address) boolResult {
 // isEmptyCell reports whether a source cell is empty (spillable): out of the
 // source grid, or a blank non-formula cell.
 func (s Sheet) isEmptyCell(at Address) boolResult {
-	if at.Row >= len(s.cells) || at.Col >= len(s.cells[at.Row]) {
+	if at.Row >= s.height() || at.Col >= len(s.rowsView()[at.Row]) {
 		return true
 	}
-	cl := s.cells[at.Row][at.Col]
+	cl := s.rowsView()[at.Row][at.Col]
 	return boolResult(cl.text == "" && !bool(cl.isFormula()))
 }
+
+// The storage seam (spec 016 area 3): every read of the cell grid goes through
+// these accessors — height, widest, rowsView for whole-grid walks, at for one
+// cell — and every edit path materializes through grid. The accessors are what
+// the indexed backing replaces in area 4; the walks and grid are the surfaces
+// the overlay takes over in area 5. Nothing outside this seam may touch
+// s.cells.
+
+// height is the grid's row count.
+func (s Sheet) height() int { return len(s.cells) }
+
+// widest is the column count of the widest row.
+func (s Sheet) widest() int { return widestRow(s.cells) }
+
+// rowsView is the whole grid for a read-only walk (compute, check, source
+// serialization); mutation belongs to the grid accessor below.
+func (s Sheet) rowsView() [][]cell { return s.cells }
+
+// grid is the materialized edit surface: the current cells, handed to the
+// structural and fill/paste machinery that rebuilds a new grid from them.
+func (s Sheet) grid() [][]cell { return s.cells }
 
 // at returns the cell at (row, col); the boolean reports whether the position
 // is within the grid.
@@ -180,7 +201,7 @@ func (s Sheet) at(row rowIndex, col colIndex) (cell, boolResult) {
 // order.
 func (s Sheet) Cells() []CellInfo {
 	var out []CellInfo
-	for r, row := range s.cells {
+	for r, row := range s.rowsView() {
 		for c, cl := range row {
 			if cl.text == "" {
 				continue
@@ -198,8 +219,8 @@ func (s Sheet) Cells() []CellInfo {
 // Source returns the sheet's cell source texts (literals and "=formulas") as a
 // grid — what an editor shows and what is saved back to the .tsvt file.
 func (s Sheet) Source() Grid {
-	out := make(Grid, len(s.cells))
-	for r, row := range s.cells {
+	out := make(Grid, s.height())
+	for r, row := range s.rowsView() {
 		out[r] = make([]string, len(row))
 		for c, cl := range row {
 			out[r][c] = cl.text
@@ -227,7 +248,7 @@ func (s Sheet) Set(addr Address, text string, limits Limits) (Sheet, error) {
 	if err != nil {
 		return Sheet{}, err
 	}
-	cells := growCells(s.cells, addr)
+	cells := growCells(s.grid(), addr)
 	cells[addr.Row][addr.Col] = parsed
 	return Sheet{cells: cells}, nil
 }

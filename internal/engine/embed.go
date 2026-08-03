@@ -210,7 +210,7 @@ func (s Sheet) outputCell() (Address, boolResult) {
 	var found Address
 	count := 0
 	s.eachFormula(func(at Address) {
-		if isOutputCall(s.cells[at.Row][at.Col].formula) {
+		if isOutputCall(s.rowsView()[at.Row][at.Col].formula) {
 			found, count = at, count+1
 		}
 	})
