@@ -2,7 +2,6 @@ package engine
 
 import (
 	"math"
-	"strings"
 )
 
 // numerics collects the numeric operands of an aggregate: empty cells are
@@ -144,16 +143,6 @@ func roundPlaces(args []Value) (places decimalPlaces, bad Value, isOK bool) {
 		return 0, v, false
 	}
 	return decimalPlaces(p), Value{}, true
-}
-
-// fnConcat joins the string forms of its operands (error operands are
-// short-circuited by the eager dispatcher).
-func fnConcat(args []Value) Value {
-	var b strings.Builder
-	for _, arg := range args {
-		_, _ = b.WriteString(arg.String())
-	}
-	return stringValue(textVal(b.String()))
 }
 
 // fnLen is the character (rune) length of a single operand's string form, not

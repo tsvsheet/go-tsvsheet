@@ -42,6 +42,9 @@ var (
 	cellsRest       = paramModes{rest: modeCells}
 	cellsThenK      = paramModes{rest: modeCells, tail: []argMode{modeScalar}}
 	scalarThenCells = paramModes{lead: []argMode{modeScalar}, rest: modeCells}
+	// TEXTJOIN's delimiter and ignore-empty flag are scalars ahead of the
+	// flattened text operands, so a range in the third slot cannot shift them.
+	twoScalarsThenCells = paramModes{lead: []argMode{modeScalar, modeScalar}, rest: modeCells}
 )
 
 // argValues materializes call arguments per the declared parameter modes: a
