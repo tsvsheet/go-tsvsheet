@@ -105,3 +105,73 @@ func TestLazyCellsLatchShortCircuitsRetries(t *testing.T) {
 	assert.ErrorIs(t, err, constants.ErrReadInput)
 	assert.Equal(t, 1, pairSrc.lowReads, "the fresh address A2 answers through the latch too")
 }
+
+// meteredSource counts every ReadAt and can kill a byte region — the
+// discriminator for admit-before-fetch, which no cache-size assertion can see
+// (the bounded cache hides evicted fetches).
+type meteredSource struct {
+	data      []byte
+	failBelow int64
+	reads     int
+}
+
+func (m *meteredSource) ReadAt(p []byte, off int64) (int, error) {
+	m.reads++
+	if m.failBelow > 0 && off < m.failBelow {
+		return 0, assert.AnError
+	}
+	if off >= int64(len(m.data)) {
+		return 0, io.EOF
+	}
+	return copy(p, m.data[off:]), nil
+}
+
+// TestReadAdmitsBeforeFetchingSoARefusedRangeCostsOneRead pins the branch's
+// headline property by the only observable that can see it — the source's own
+// call count: a refused whole-column sum performs ONE dependency read (the
+// first, admitted cell's block), never one per block of the refused range.
+// The adversary's N3 mutant (fetch-before-admit) scans and evicts 79 blocks
+// through the bounded cache while every size assertion stays green.
+func TestReadAdmitsBeforeFetchingSoARefusedRangeCostsOneRead(t *testing.T) {
+	t.Parallel()
+
+	doc := "=sum(A2:A20000)\n" + strings.Repeat("1\n", 19999)
+	src := &meteredSource{data: []byte(doc)}
+	limits := engine.Limits{
+		ResultCells: 1 << 20, GridDim: 1 << 20, ResultBytes: 100,
+		ResidentCells: 1, TouchedCells: 10, SpanCells: 1 << 20,
+	}
+	_, windowed, err := engine.OpenSheet(engine.ByteSource{ReadAt: src, Size: int64(len(src.data))}, limits)
+	require.NoError(t, err)
+	require.NotNil(t, windowed)
+
+	before := src.reads
+	got, err := windowed.ComputeRows(0, 1, engine.ComputeOptions{Limits: limits})
+	require.NoError(t, err)
+	assert.Equal(t, string(engine.ErrLimit), got[0][0])
+	assert.LessOrEqual(t, src.reads-before, 4,
+		"a refused range reads at most the window's and the first admitted cells' blocks")
+}
+
+// TestBudgetRefusalShieldsADeadSource pins the second observable of the same
+// order: cells the budget refuses are never fetched, so a range lying in a
+// DEAD region still answers #LIMIT! cleanly — fetch-before-admit would latch
+// the dead source and fail the whole call instead.
+func TestBudgetRefusalShieldsADeadSource(t *testing.T) {
+	t.Parallel()
+
+	doc := "x\n" + strings.Repeat("1\n", 300) + "=sum(A2:A200)\n"
+	src := &meteredSource{data: []byte(doc)}
+	limits := engine.Limits{
+		ResultCells: 1 << 20, GridDim: 1 << 20, ResultBytes: 100,
+		ResidentCells: 1, TouchedCells: 1, SpanCells: 1 << 20,
+	}
+	_, windowed, err := engine.OpenSheet(engine.ByteSource{ReadAt: src, Size: int64(len(src.data))}, limits)
+	require.NoError(t, err)
+	require.NotNil(t, windowed)
+
+	src.failBelow = 4 // the whole refused range lives in the dead region
+	got, err := windowed.ComputeRows(301, 1, engine.ComputeOptions{Limits: limits})
+	require.NoError(t, err, "the budget refused every ranged cell before any dead read could latch")
+	assert.Equal(t, string(engine.ErrLimit), got[0][0])
+}

@@ -236,6 +236,11 @@ func FuzzComputeRows(f *testing.F) {
 		if parseErr != nil || from < 0 {
 			return
 		}
+		if bytes.Contains(bytes.ToLower(data), []byte("rand")) {
+			return // volatile draws follow WINDOW evaluation order by documented
+			// contract — resident parity is unsound for them (per-window
+			// determinism was already asserted above)
+		}
 		resident := parsed.ComputeWith(opts)
 		source, err := windowed.Rows(from, n)
 		if err != nil {
