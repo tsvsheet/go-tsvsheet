@@ -59,18 +59,27 @@ func scan(t *testing.T, src string, stride int) index.Index {
 	return ix
 }
 
-// oracle computes the census and per-row offsets naively from the whole text —
-// the independent truth every index answer is compared against.
+// oracle computes the census, per-row offsets, physical lines, and cumulative
+// counters naively from the whole text — the independent truth every index
+// answer is compared against. Its scanner carries the same 1 MiB bound the
+// fuzz target scans under and its error is fatal, so the oracle can never
+// silently truncate and prove nothing (the adversary's finding: an unchecked
+// default 64 KiB cap made long-line fuzz cases compare against a wrong truth).
 type oracleDoc struct {
-	rowOffsets []int64 // byte offset of each GRID row's physical line
-	census     index.Census
+	rowOffsets  []int64              // byte offset of each GRID row's physical line
+	rowLines    []index.LineNumber   // physical line of each grid row
+	rowCells    []index.CellCount    // cumulative cells BEFORE each grid row
+	rowFormulas []index.FormulaCount // cumulative formulas BEFORE each grid row
+	census      index.Census
 }
 
-func oracle(src string) oracleDoc {
+func oracle(tb testing.TB, src string) oracleDoc {
+	tb.Helper()
 	var doc oracleDoc
 	var offset int64
 	line := 0
 	scanner := bufio.NewScanner(strings.NewReader(src))
+	scanner.Buffer(nil, 1<<20)
 	scanner.Split(splitTerminators)
 	rest := []byte(src)
 	for scanner.Scan() {
@@ -80,6 +89,9 @@ func oracle(src string) oracleDoc {
 		doc.census.Lines++
 		if !isComment(index.LineNumber(line), []byte(text)) {
 			doc.rowOffsets = append(doc.rowOffsets, offset)
+			doc.rowLines = append(doc.rowLines, index.LineNumber(line))
+			doc.rowCells = append(doc.rowCells, doc.census.Cells)
+			doc.rowFormulas = append(doc.rowFormulas, doc.census.Formulas)
 			doc.census.Rows++
 			fields := strings.Split(text, "\t")
 			doc.census.Cells += index.CellCount(len(fields))
@@ -95,6 +107,7 @@ func oracle(src string) oracleDoc {
 		offset += int64(consumed)
 		rest = rest[consumed:]
 	}
+	require.NoError(tb, scanner.Err(), "the oracle itself must never truncate")
 	return doc
 }
 
@@ -139,7 +152,7 @@ func TestScanCensusMatchesTheOracle(t *testing.T) {
 		for _, stride := range []int{1, 2, 3, 64} {
 			t.Run(name+"/stride", func(t *testing.T) {
 				t.Parallel()
-				assert.Equal(t, oracle(src).census, scan(t, src, stride).Census(),
+				assert.Equal(t, oracle(t, src).census, scan(t, src, stride).Census(),
 					"src=%q stride=%d", src, stride)
 			})
 		}
@@ -158,16 +171,19 @@ func TestLocateFindsACheckpointAtOrBeforeEveryRow(t *testing.T) {
 		for _, stride := range []int{1, 2, 3, 64} {
 			t.Run(name, func(t *testing.T) {
 				t.Parallel()
-				truth := oracle(src)
+				truth := oracle(t, src)
 				ix := scan(t, src, stride)
 				for row := 0; row < truth.census.Rows; row++ {
 					cp, ok := ix.Locate(index.GridRow(row))
 					require.True(t, ok, "row %d must be locatable", row)
 					assert.LessOrEqual(t, int(cp.Row), row, "checkpoint may not overshoot")
-					assert.GreaterOrEqual(t, row-int(cp.Row), 0)
-					assert.LessOrEqual(t, truth.rowOffsets[cp.Row], truth.rowOffsets[row])
+					assert.Less(t, row-int(cp.Row), stride,
+						"forward scanning from the checkpoint is bounded by one stride of data lines")
 					assert.Equal(t, truth.rowOffsets[cp.Row], int64(cp.Offset),
 						"checkpoint offset must be the line start of its own grid row")
+					assert.Equal(t, truth.rowLines[cp.Row], cp.Line, "checkpoint physical line")
+					assert.Equal(t, truth.rowCells[cp.Row], cp.Cells, "cumulative cells before the checkpoint")
+					assert.Equal(t, truth.rowFormulas[cp.Row], cp.Formulas, "cumulative formulas before the checkpoint")
 				}
 				_, ok := ix.Locate(index.GridRow(truth.census.Rows))
 				assert.False(t, ok, "one past the last row is unlocatable")
@@ -190,37 +206,42 @@ func TestScanRefusesAnOverlongLine(t *testing.T) {
 	assert.ErrorIs(t, err, index.ErrScan)
 }
 
-// FuzzScanAgreesWithTheOracle holds the index to the naive whole-file truth
-// over arbitrary bytes: identical census, and every row locatable at a
-// checkpoint whose offset is exactly that row's line start.
-func FuzzScanAgreesWithTheOracle(f *testing.F) {
-	for _, src := range corpus {
-		f.Add([]byte(src), 3)
-	}
-	f.Fuzz(func(t *testing.T, data []byte, stride int) {
-		if stride < 1 || stride > 1024 {
-			return
-		}
-		ix, err := index.Scan(bytes.NewReader(data), index.SourceSize(len(data)), index.Options{
-			Stride:       index.StrideLines(stride),
-			Split:        splitTerminators,
-			IsComment:    isComment,
-			MaxLineBytes: 1 << 20,
-		})
-		if err != nil {
-			t.Fatalf("scan refused fuzz input under a generous line bound: %v", err)
-		}
-		truth := oracle(string(data))
-		if ix.Census() != truth.census {
-			t.Fatalf("census diverged: %+v vs oracle %+v", ix.Census(), truth.census)
-		}
-		for row := 0; row < truth.census.Rows; row++ {
-			cp, ok := ix.Locate(index.GridRow(row))
-			if !ok || int64(cp.Offset) != truth.rowOffsets[cp.Row] || int(cp.Row) > row {
-				t.Fatalf("locate(%d) broke its contract: %+v ok=%v", row, cp, ok)
+// TestScanRefusesEachMissingRuleAlone pins the requirement one rule at a time:
+// either injected rule missing — not only both — is ErrScan before any read.
+func TestScanRefusesEachMissingRuleAlone(t *testing.T) {
+	t.Parallel()
+
+	_, err := index.Scan(strings.NewReader("x\n"), 2, index.Options{Split: splitTerminators})
+	assert.ErrorIs(t, err, index.ErrScan, "missing IsComment alone is refused")
+	_, err = index.Scan(strings.NewReader("x\n"), 2, index.Options{IsComment: isComment})
+	assert.ErrorIs(t, err, index.ErrScan, "missing Split alone is refused")
+	_, err = index.Scan(strings.NewReader("x\n"), -1, index.Options{Split: splitTerminators, IsComment: isComment})
+	assert.ErrorIs(t, err, index.ErrScan, "a negative size is refused, never a silent empty index")
+}
+
+// TestCheckedSplitNeverAdmitsADefectiveRule pins the two injected-Split defects as
+// ErrScan: the skip form (advance without a token — bufio drops the remainder
+// at EOF, making the census depend on read chunking) and a token without
+// progress (an unbounded loop otherwise). A defective engine rule must surface
+// as a refusal, never as a wrong index or a hang.
+func TestCheckedSplitNeverAdmitsADefectiveRule(t *testing.T) {
+	t.Parallel()
+
+	skipForm := func(data []byte, isAtEOF bool) (int, []byte, error) {
+		if len(data) > 0 && data[0] == '!' {
+			i := bytes.IndexByte(data, '\n')
+			if i >= 0 {
+				return i + 1, nil, nil // consume the line, emit nothing
 			}
 		}
-	})
+		return splitTerminators(data, isAtEOF)
+	}
+	_, err := index.Scan(strings.NewReader("!skip\na\n"), 8, index.Options{Split: skipForm, IsComment: isComment})
+	assert.ErrorIs(t, err, index.ErrScan, "the skip form is refused")
+
+	stuck := func([]byte, bool) (int, []byte, error) { return 0, []byte{}, nil }
+	_, err = index.Scan(strings.NewReader("abc"), 3, index.Options{Split: stuck, IsComment: isComment})
+	assert.ErrorIs(t, err, index.ErrScan, "a token without progress is refused, not looped on")
 }
 
 // failingReader errors on any read past its prefix, standing in for a source

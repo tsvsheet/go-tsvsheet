@@ -119,39 +119,71 @@ func (ix Index) Locate(row GridRow) (Checkpoint, bool) {
 
 // Scan reads the source once, sequentially, and builds the index. It never
 // retains source bytes: memory is the checkpoint table alone. Both language
-// rules are required; a Split that consumes bytes without emitting a token
-// (bufio's skip form) is honored — the skipped bytes move the offset before
-// the next line starts.
+// rules are required, and the injected Split must emit a token for every byte
+// it consumes and consume at least one byte with every token: bufio's skip
+// form (advance without a token) is REFUSED, because at EOF bufio treats any
+// nil-token return as end-of-scan and silently drops the remainder — the
+// census would then depend on how the reader chunks — and a token without
+// progress would loop forever. Both defects surface as ErrScan, never as a
+// wrong index or a hang.
 func Scan(r io.ReaderAt, size SourceSize, opts Options) (Index, error) {
-	if opts.Split == nil || opts.IsComment == nil {
-		return Index{}, ErrScan.With(nil, "reason", "Split and IsComment are required")
+	if reason, refused := scanRefusal(size, opts); refused {
+		return Index{}, ErrScan.With(nil, "reason", reason)
 	}
 	state := newScanState(opts)
-	advance, preskip := 0, 0
+	advance := 0
 	scanner := bufio.NewScanner(io.NewSectionReader(r, 0, int64(size)))
 	// A nil initial buffer, deliberately: bufio takes the LARGER of the buffer
 	// capacity and max, so any preallocated capacity above maxLine would defeat
 	// the bound.
 	scanner.Buffer(nil, state.maxLine)
-	scanner.Split(func(data []byte, isAtEOF bool) (advanced int, token []byte, err error) {
-		advanced, token, err = opts.Split(data, isAtEOF)
-		switch {
-		case err != nil:
-		case token == nil:
-			preskip += advanced // a pre-token skip (or 0 for "need more data")
-		default:
+	scanner.Split(func(data []byte, isAtEOF bool) (int, []byte, error) {
+		advanced, token, err := checkedSplit(opts.Split, data, isEOF(isAtEOF))
+		if err == nil && token != nil {
 			advance = advanced // the token plus its terminator: this line's true byte length
 		}
 		return advanced, token, err
 	})
 	for scanner.Scan() {
-		state = state.line(scanner.Bytes(), advance, preskip)
-		preskip = 0
+		state = state.line(scanner.Bytes(), advance)
 	}
 	if err := scanner.Err(); err != nil {
 		return Index{}, ErrScan.With(err)
 	}
 	return Index{stride: state.stride, census: state.census}, nil
+}
+
+// scanRefusal names the up-front refusal, if any: a negative size, or a
+// missing injected rule.
+func scanRefusal(size SourceSize, opts Options) (string, bool) {
+	switch {
+	case size < 0:
+		return "negative source size", true
+	case opts.Split == nil || opts.IsComment == nil:
+		return "Split and IsComment are required", true
+	default:
+		return "", false
+	}
+}
+
+// isEOF reports whether the scanner has reached the end of its input.
+type isEOF bool
+
+// checkedSplit runs the injected Split and refuses its two defect shapes: the
+// chunk-dependent skip form (advance without a token — bufio silently drops
+// the remainder at EOF), and a token without progress (an unbounded loop
+// otherwise). Each surfaces as ErrScan, never as a wrong index or a hang
+// (pinned by TestCheckedSplitNeverAdmitsADefectiveRule).
+func checkedSplit(split bufio.SplitFunc, data []byte, isAtEnd isEOF) (int, []byte, error) {
+	advanced, token, err := split(data, bool(isAtEnd))
+	switch {
+	case err != nil:
+	case token == nil && advanced > 0:
+		return 0, nil, ErrScan.With(nil, "reason", "skip-form Split is unsupported")
+	case token != nil && advanced == 0 && !bool(isAtEnd):
+		return 0, nil, ErrScan.With(nil, "reason", "Split returned a token without consuming input")
+	}
+	return advanced, token, err
 }
 
 // scanState is one Scan pass's fold state — the growing checkpoint table, the
@@ -178,12 +210,11 @@ func newScanState(opts Options) scanState {
 	return scanState{opts: opts, maxLine: maxLine}
 }
 
-// line folds one physical line into the next state: any pre-token skip moves
-// the cursor first, classification happens while offset names the line's first
-// byte (the checkpoint anchor), then the cursor advances by the line's true
-// consumed length — token plus terminator, as the injected Split reported it.
-func (s scanState) line(text []byte, advance, preskip int) scanState {
-	s.offset += ByteOffset(preskip)
+// line folds one physical line into the next state: classification happens
+// while offset names the line's first byte (the checkpoint anchor), then the
+// cursor advances by the line's true consumed length — token plus terminator,
+// as the injected Split reported it.
+func (s scanState) line(text []byte, advance int) scanState {
 	s.census.Lines++
 	if !s.opts.IsComment(LineNumber(s.census.Lines), text) {
 		s = s.dataLine(text)
