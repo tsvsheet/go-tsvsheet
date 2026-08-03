@@ -143,3 +143,25 @@ func TestWindowedRowsSurfaceALateSourceFailureAsErrReadInput(t *testing.T) {
 	_, err = windowed.Rows(0, 2)
 	assert.ErrorIs(t, err, constants.ErrReadInput)
 }
+
+// TestCensusReportsWithoutMaterializing pins the 018 pre-flight: Census
+// agrees exactly with the windowed capability's own census, reports through
+// one scan with no cell parsed (the malformed formula is never reached), and
+// maps a scan refusal to ErrReadInput like every load path.
+func TestCensusReportsWithoutMaterializing(t *testing.T) {
+	t.Parallel()
+
+	src := "#. note\na\tb\n=)(malformed\td\n"
+	census, err := engine.Census(engine.ByteSource{ReadAt: bytes.NewReader([]byte(src)), Size: int64(len(src))})
+	require.NoError(t, err, "a census never parses cells, so the malformed formula is unreachable")
+	assert.Equal(t, engine.SheetCensus{Rows: 2, MaxWidth: 2, Cells: 4, Formulas: 1}, census)
+
+	limits := engine.Limits{ResultCells: 100, GridDim: 100, ResultBytes: 100, ResidentCells: 1}
+	_, windowed := open(t, src, limits)
+	require.NotNil(t, windowed)
+	assert.Equal(t, windowed.Census(), census, "the pre-flight census IS the capability's census")
+
+	long := strings.Repeat("a", (1<<20)+2) + "\n"
+	_, err = engine.Census(engine.ByteSource{ReadAt: bytes.NewReader([]byte(long)), Size: int64(len(long))})
+	assert.ErrorIs(t, err, constants.ErrReadInput)
+}

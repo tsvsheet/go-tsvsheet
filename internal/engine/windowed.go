@@ -67,6 +67,20 @@ func (w WindowedSheet) CachedCells() int64 {
 	return int64(w.source.reader.CachedCells())
 }
 
+// Census reports a source's totals from one index scan — O(index) memory,
+// nothing materialized. It is the cheap pre-flight a frontend runs to decide
+// or refuse before buffering or parsing anything (spec 018): the CLI vets a
+// file's cell count against its budget in tens of megabytes where buffering
+// first would transiently hold the whole file.
+func Census(src ByteSource) (SheetCensus, error) {
+	ix, err := index.Scan(src.ReadAt, index.SourceSize(src.Size), indexOptions())
+	if err != nil {
+		return SheetCensus{}, readFailure(err)
+	}
+	c := ix.Census()
+	return SheetCensus{Rows: c.Rows, MaxWidth: c.MaxWidth, Cells: int64(c.Cells), Formulas: int64(c.Formulas)}, nil
+}
+
 // Census reports the windowed document's totals.
 func (w WindowedSheet) Census() SheetCensus {
 	c := w.source.ix.Census()

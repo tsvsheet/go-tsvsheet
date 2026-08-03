@@ -256,3 +256,14 @@ func TestDiagnosticCarriesACellForAGridFindingAndALineForADirectiveOne(t *testin
 	assert.Equal(t, "A1", cellDiags[0].Cell, "a grid finding is located by cell")
 	assert.Zero(t, cellDiags[0].Line)
 }
+
+// TestCensus_FacadePreflight pins the public census: totals with nothing
+// materialized.
+func TestCensus_FacadePreflight(t *testing.T) {
+	t.Parallel()
+
+	src := "a\tb\n=A1\n"
+	census, err := tsvsheet.Census(tsvsheet.ByteSource{ReadAt: bytes.NewReader([]byte(src)), Size: int64(len(src))})
+	require.NoError(t, err)
+	assert.Equal(t, tsvsheet.SheetCensus{Rows: 2, MaxWidth: 2, Cells: 3, Formulas: 1}, census)
+}

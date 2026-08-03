@@ -78,6 +78,21 @@ func ParseEdits(src []byte) (Edits, error) {
 	return edits, nil
 }
 
+// ParseEditsWith is ParseEdits under a residency budget (spec 018): a batch
+// whose line count (each line is at most one op) exceeds Limits' effective
+// resident ceiling refuses
+// with ErrDocTooLarge before any op parses — each op touches at least one
+// cell, so a batch larger than the cells a document may hold is over budget
+// by construction, and no caller pays an unbounded op-slice allocation it did
+// not raise its budget to accept.
+func ParseEditsWith(src []byte, limits Limits) (Edits, error) {
+	budget := limits.EffectiveResidentCells()
+	if lines := int64(len(splitEditLines(src))); lines > budget {
+		return Edits{}, constants.ErrDocTooLarge.With(nil, "ops", lines, "budget", budget)
+	}
+	return ParseEdits(src)
+}
+
 // Apply left-folds e's ops over d. When e names a base revision that is not
 // d's, the whole batch is refused (constants.ErrEditsBase); when any op is
 // refused, the whole batch is rejected with constants.ErrEditsApply wrapping

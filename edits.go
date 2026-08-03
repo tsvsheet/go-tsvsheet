@@ -20,6 +20,14 @@ func Revision(d Document) RevisionHex { return engine.Revision(d) }
 // ErrEdits* sentinel carrying its 1-based line number.
 func ParseEdits(src []byte) (Edits, error) { return engine.ParseEdits(src) }
 
+// ParseEditsWith is ParseEdits under a residency budget (spec 018): a batch
+// whose line count (each line is at most one op) exceeds the effective
+// resident ceiling refuses with
+// ErrDocTooLarge before any op parses.
+func ParseEditsWith(src []byte, limits Limits) (Edits, error) {
+	return engine.ParseEditsWith(src, limits)
+}
+
 // Apply left-folds e's ops over d: atomic (a refused op rejects the whole
 // batch), base-checked (ErrEditsBase when e names a revision that is not d's),
 // and deterministic — nothing outside (d, e, limits) influences the result.

@@ -248,6 +248,11 @@ func OpenSheet(src ByteSource, limits Limits) (Sheet, *WindowedSheet, error) {
 	return engine.OpenSheet(src, limits)
 }
 
+// Census reports a source's totals from one index scan — O(index) memory,
+// nothing materialized: the cheap pre-flight a frontend runs to decide or
+// refuse before buffering or parsing anything (spec 018).
+func Census(src ByteSource) (SheetCensus, error) { return engine.Census(src) }
+
 // ByteSource is an any-size byte source — a file, a spooled stream, or
 // in-memory bytes — with its length.
 type ByteSource = engine.ByteSource

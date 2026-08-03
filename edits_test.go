@@ -55,3 +55,18 @@ func TestFacadeEditsApplySentinel(t *testing.T) {
 	require.Error(t, err)
 	assert.ErrorIs(t, err, tsvsheet.ErrEditsApply)
 }
+
+// TestParseEditsWith_FacadeGates pins the public bounded edits parse:
+// over-budget batches refuse matchable as ErrDocTooLarge; in-budget batches
+// parse as ParseEdits does.
+func TestParseEditsWith_FacadeGates(t *testing.T) {
+	t.Parallel()
+
+	over := []byte("setCell\tA1\t1\nsetCell\tA2\t2\n")
+	_, err := tsvsheet.ParseEditsWith(over, tsvsheet.Limits{ResidentCells: 1})
+	require.ErrorIs(t, err, tsvsheet.ErrDocTooLarge)
+
+	batch, err := tsvsheet.ParseEditsWith([]byte("setCell\tA1\t1\n"), tsvsheet.DefaultLimits())
+	require.NoError(t, err)
+	assert.Equal(t, 1, batch.Len())
+}
