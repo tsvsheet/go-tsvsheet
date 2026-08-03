@@ -1,6 +1,7 @@
 package engine_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -8,6 +9,7 @@ import (
 
 	"github.com/tsvsheet/go-tsvsheet/internal/constants"
 	"github.com/tsvsheet/go-tsvsheet/internal/engine"
+	"github.com/tsvsheet/go-tsvsheet/internal/index"
 )
 
 func TestCells_ProjectsNonEmpty(t *testing.T) {
@@ -130,4 +132,18 @@ func TestSource_RoundTrips(t *testing.T) {
 	src := s.Source()
 	assert.Equal(t, "a", src[0][0])
 	assert.Equal(t, "=A1", src[0][1]) // formula source kept verbatim
+}
+
+// TestParseMapsScanFailuresToErrReadInput pins the load contract across the
+// indexed read path: a source the scanner refuses (an over-long line) is the
+// documented ErrReadInput, with the index layer's ErrScan preserved as its
+// cause — never a bare or re-branded error.
+func TestParseMapsScanFailuresToErrReadInput(t *testing.T) {
+	t.Parallel()
+
+	long := strings.Repeat("a", (1<<20)+2) + "\n"
+	_, err := engine.Parse([]byte(long))
+	require.Error(t, err)
+	assert.ErrorIs(t, err, constants.ErrReadInput)
+	assert.ErrorIs(t, err, index.ErrScan, "the scan cause survives the mapping")
 }

@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/tsvsheet/go-tsvsheet/internal/constants"
+	"github.com/tsvsheet/go-tsvsheet/internal/index"
 	"github.com/tsvsheet/go-tsvsheet/internal/tsvt"
 )
 
@@ -45,30 +46,18 @@ const formulaMarker = "="
 
 // Parse reads a .tsvt grid: each TAB-separated field is a literal, or — when it
 // begins with `=` — a formula compiled from the expression that follows. A
-// malformed formula is a syntax error naming its cell.
+// malformed formula is a syntax error naming its cell. The bytes are indexed
+// and read through the one materialization path every source shares (spec
+// 016).
 func Parse(src []byte) (Sheet, error) {
-	grid, err := ReadTSV(bytes.NewReader(src))
+	source, err := newSheetSource(readerAtSize{
+		at:   bytes.NewReader(src),
+		size: index.SourceSize(len(src)),
+	})
 	if err != nil {
 		return Sheet{}, err
 	}
-	return sheetFromGrid(grid)
-}
-
-// sheetFromGrid parses every field of a raw grid into a Sheet, naming the cell
-// on a formula syntax error.
-func sheetFromGrid(grid Grid) (Sheet, error) {
-	cells := make([][]cell, len(grid))
-	for r, row := range grid {
-		cells[r] = make([]cell, len(row))
-		for c, text := range row {
-			parsed, cellErr := parseCell(textVal(text), rowIndex(r), colIndex(c))
-			if cellErr != nil {
-				return Sheet{}, cellErr
-			}
-			cells[r][c] = parsed
-		}
-	}
-	return Sheet{cells: cells}, nil
+	return materializeSheet(source)
 }
 
 // parseCell classifies a field as a literal or compiles its formula, naming the

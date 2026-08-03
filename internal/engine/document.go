@@ -31,19 +31,17 @@ type Document struct {
 // physical line layout so comment and shebang lines are preserved by Text.
 func ParseDocument(src []byte) (Document, error) {
 	var layout []docLine
-	grid := Grid{}
 	err := scanLines(bytes.NewReader(src), func(text string, isComment bool) {
 		if isComment {
 			layout = append(layout, docLine{comment: text})
 			return
 		}
 		layout = append(layout, docLine{isRow: true})
-		grid = append(grid, strings.Split(text, tab))
 	})
 	if err != nil {
 		return Document{}, err
 	}
-	sheet, err := sheetFromGrid(grid)
+	sheet, err := Parse(src)
 	if err != nil {
 		return Document{}, err
 	}
