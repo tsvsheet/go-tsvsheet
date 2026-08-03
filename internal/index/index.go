@@ -14,6 +14,7 @@ package index
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"io"
 	"sort"
 
@@ -153,9 +154,18 @@ func Scan(r io.ReaderAt, size SourceSize, opts Options) (Index, error) {
 		state = state.line(scanner.Bytes(), advance)
 	}
 	if err := scanner.Err(); err != nil {
-		return Index{}, ErrScan.With(err)
+		return Index{}, scanFailure(err)
 	}
 	return Index{stride: state.stride, census: state.census}, nil
+}
+
+// scanFailure wraps a scanner error as ErrScan once: a checkedSplit refusal
+// already carries the sentinel and passes through unstuttered.
+func scanFailure(err error) error {
+	if errors.Is(err, ErrScan) {
+		return err
+	}
+	return ErrScan.With(err)
 }
 
 // scanRefusal names the up-front refusal, if any: a negative size, or a

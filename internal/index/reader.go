@@ -77,14 +77,17 @@ func (r *Reader) ReadRows(from GridRow, n RowCount) ([][]string, error) {
 	return out, nil
 }
 
-// clipWindow intersects [from, from+n) with [0, rows).
+// clipWindow intersects [from, from+n) with [0, rows). The end is computed as
+// start plus the smaller of n and the rows remaining — subtraction of two
+// small non-negatives — so a count near MaxInt64 clips instead of wrapping a
+// sum negative (the adversary's boundary find: start+n overflowed and answered
+// an empty window one count past where it answered the whole grid).
 func clipWindow(from GridRow, n, rows RowCount) (GridRow, GridRow) {
 	start := max(from, 0)
 	if n <= 0 || RowCount(start) >= rows {
 		return start, start
 	}
-	end := GridRow(min(int64(start)+int64(n), int64(rows)))
-	return start, end
+	return start, start + GridRow(min(n, rows-RowCount(start)))
 }
 
 // copyRows copies the block's rows covering [row, end) — caller-owned copies,

@@ -2,6 +2,7 @@ package index_test
 
 import (
 	"io"
+	"math"
 	"strings"
 	"testing"
 
@@ -134,6 +135,9 @@ func TestReadRowsClipsHostileWindows(t *testing.T) {
 	got, err = r.ReadRows(1, index.RowCount(1)<<40)
 	require.NoError(t, err)
 	assert.Equal(t, truth[1:], got, "a huge count clips to the grid without allocating for it")
+	got, err = r.ReadRows(1, math.MaxInt64)
+	require.NoError(t, err)
+	assert.Equal(t, truth[1:], got, "the extreme count answers identically — no sum may wrap")
 	got, err = r.ReadRows(9, 3)
 	require.NoError(t, err)
 	assert.Empty(t, got, "past the grid is empty")
@@ -206,9 +210,10 @@ func TestReaderAppliesTheOptionDefaults(t *testing.T) {
 
 // TestScanBlockCarriesTheExactPhysicalLine pins the checkpoint's carried line
 // number with a rule that is line-sensitive PAST line 1 (the shebang rule
-// cannot be, since a shebang line is never a data line, so any off-by-one in
-// the carried line was invisible): line 3, and only line 3, is a comment when
-// it starts with '%'. A one-off error in scanBlock's line arithmetic
+// is not, since a shebang line is never a data line, so any off-by-one in
+// the carried line was invisible): line 2, and only line 2, is a comment when
+// it starts with '%' — sitting INSIDE the first block, where scanBlock's
+// arithmetic is what numbers it. A one-off error in scanBlock's line arithmetic
 // misclassifies it and the rows diverge from the oracle.
 func TestScanBlockCarriesTheExactPhysicalLine(t *testing.T) {
 	t.Parallel()
