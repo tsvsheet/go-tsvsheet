@@ -131,6 +131,13 @@ const (
 // malformed formula is a syntax error naming its cell.
 func Parse(src []byte) (Sheet, error) { return engine.Parse(src) }
 
+// ParseWith is Parse under a residency budget (spec 018): a document whose
+// census exceeds Limits.ResidentCells (single-ceiling fallback like its
+// siblings) refuses with ErrDocTooLarge before anything materializes; an
+// in-budget document parses identically to Parse (FuzzParseWith is the parity
+// oracle). Parse stays unbounded for embedders that pre-vet their sources.
+func ParseWith(src []byte, limits Limits) (Sheet, error) { return engine.ParseWith(src, limits) }
+
 // Selection is a set of 1-based positions on one axis.
 type Selection = engine.Selection
 

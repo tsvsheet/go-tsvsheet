@@ -162,3 +162,23 @@ func TestParseDocumentTextRoundTripsCanonicalSource(t *testing.T) {
 		})
 	}
 }
+
+// TestParseDocumentWithGatesLikeParseWith pins the document form of the 018
+// census gate: an over-budget document refuses as ErrDocTooLarge before its
+// layout builds (the malformed-formula discriminator again), and an in-budget
+// document round-trips byte-identically to ParseDocument.
+func TestParseDocumentWithGatesLikeParseWith(t *testing.T) {
+	t.Parallel()
+
+	over := []byte("#. note\na\tb\n=)(malformed\td\n")
+	_, err := engine.ParseDocumentWith(over, engine.Limits{ResidentCells: 3})
+	require.ErrorIs(t, err, constants.ErrDocTooLarge)
+	assert.NotErrorIs(t, err, constants.ErrSyntax, "the gate precedes cell parsing")
+
+	src := []byte("#. note\na\tb\nc\td\n")
+	bounded, err := engine.ParseDocumentWith(src, engine.Limits{ResidentCells: 4})
+	require.NoError(t, err)
+	unbounded, err := engine.ParseDocument(src)
+	require.NoError(t, err)
+	assert.Equal(t, unbounded.Text(), bounded.Text(), "in budget, the bounded document IS ParseDocument's")
+}

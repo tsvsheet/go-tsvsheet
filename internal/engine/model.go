@@ -61,6 +61,38 @@ func Parse(src []byte) (Sheet, error) {
 	return materializeSheet(source)
 }
 
+// ParseWith is Parse under a residency budget (spec 018): the census scan —
+// O(index) memory, no cell touched — refuses a document whose cell count
+// exceeds Limits.ResidentCells (single-ceiling fallback like its siblings)
+// with ErrDocTooLarge BEFORE anything materializes, so no caller pays an
+// unbounded allocation it did not raise its budget to accept. An in-budget
+// document parses exactly as Parse does. Parse itself stays unbounded for
+// embedders that pre-vet their sources; every ecosystem load path routes
+// through the bounded forms.
+func ParseWith(src []byte, limits Limits) (Sheet, error) {
+	if err := censusGate(src, limits); err != nil {
+		return Sheet{}, err
+	}
+	return Parse(src)
+}
+
+// censusGate scans src's census and refuses an over-resident document. The
+// scan reads bytes, not cells: an over-budget document with a malformed
+// formula still refuses as too large — proof the gate precedes
+// materialization, stated by
+// TestParseWithRefusesOverBudgetBeforeAnyCellParses.
+func censusGate(src []byte, limits Limits) error {
+	ix, err := index.Scan(bytes.NewReader(src), index.SourceSize(len(src)), indexOptions())
+	if err != nil {
+		return readFailure(err)
+	}
+	budget := effectiveLimits(limits).residentBudget()
+	if cells := ix.Census().Cells; cellBudget(cells) > budget {
+		return constants.ErrDocTooLarge.With(nil, "cells", int64(cells), "budget", int64(budget))
+	}
+	return nil
+}
+
 // parseCell classifies a field as a literal or compiles its formula, naming the
 // cell (in A1 notation) on a formula syntax error.
 func parseCell(text textVal, row rowIndex, col colIndex) (cell, error) {

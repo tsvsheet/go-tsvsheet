@@ -23,3 +23,18 @@ func TestFacadeDocumentRoundTrip(t *testing.T) {
 	assert.Equal(t, "#!/usr/bin/env tsvsheet\n# prices\n7\t3\n# note\n=A1*B1\t=A1+B1\n", string(edited.Text()))
 	assert.Equal(t, tsvsheet.Grid{{"7", "3"}, {"21", "10"}}, edited.Sheet().Compute())
 }
+
+// TestParseDocumentWith_FacadeGates pins the public bounded document parse:
+// over-budget refuses matchable as ErrDocTooLarge; in-budget round-trips
+// byte-identically.
+func TestParseDocumentWith_FacadeGates(t *testing.T) {
+	t.Parallel()
+
+	src := []byte("#. note\na\tb\n")
+	_, err := tsvsheet.ParseDocumentWith(src, tsvsheet.Limits{ResidentCells: 1})
+	require.ErrorIs(t, err, tsvsheet.ErrDocTooLarge)
+
+	doc, err := tsvsheet.ParseDocumentWith(src, tsvsheet.DefaultLimits())
+	require.NoError(t, err)
+	assert.Equal(t, src, doc.Text())
+}

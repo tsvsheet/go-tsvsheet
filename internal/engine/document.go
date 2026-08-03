@@ -48,6 +48,16 @@ func ParseDocument(src []byte) (Document, error) {
 	return Document{sheet: sheet, layout: layout}, nil
 }
 
+// ParseDocumentWith is ParseDocument under the same residency budget as
+// ParseWith (spec 018): the census gate refuses an over-resident document
+// before the layout or any cell materializes.
+func ParseDocumentWith(src []byte, limits Limits) (Document, error) {
+	if err := censusGate(src, limits); err != nil {
+		return Document{}, err
+	}
+	return ParseDocument(src)
+}
+
 // Sheet returns the parsed sheet the document wraps.
 func (d Document) Sheet() Sheet { return d.sheet }
 
