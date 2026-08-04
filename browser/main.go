@@ -40,6 +40,12 @@ func main() {
 	obj.Set("references", guarded(references))
 	obj.Set("explain", guarded(explain))
 	obj.Set("seedData", guarded(seedData))
+	// The windowed capability (021): every UI pages an over-budget document
+	// the same way, so the browser gets the same census and window reads the
+	// terminal pager uses.
+	obj.Set("census", guarded(census))
+	obj.Set("windowRows", guarded(windowRows))
+	obj.Set("windowComputed", guarded(windowComputed))
 	js.Global().Set("tsvsheet", obj)
 	select {} // run until the page unloads
 }
