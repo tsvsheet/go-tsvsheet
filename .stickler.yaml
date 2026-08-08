@@ -1,0 +1,12 @@
+# Per-repo stickler overlay.
+#
+# Soft-finding baseline recorded at SUITE ADOPTION (2026-08-08) — the count as
+# found on first contact, not a target. The ratchet allows it to FALL and never
+# grow.
+#
+# All 44 are `exhaustive`: switches over the engine's valueKind that do not name
+# every member. Each is a real gap waiting for a new kind to be added, and
+# closing one means deciding what that branch should DO — a design question per
+# site rather than a mechanical edit.
+soft-baseline:
+  exhaustive: 44
