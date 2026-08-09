@@ -131,15 +131,19 @@ func decodedText(raw []byte, err error) Value {
 }
 
 // isDigest reports whether name is a range-digesting builtin.
-func isDigest(name funcName) boolResult {
-	return name == "digest" || name == "verify"
-}
+func isDigest(name funcName) boolResult { return isAmong(name, digestFns) }
+
+// digestFns are the range-serializing crypto builtins.
+// fnDigest names the range-digest builtin.
+const fnDigest = "digest"
+
+var digestFns = []funcName{fnDigest, "verify"}
 
 // evalDigest dispatches DIGEST and VERIFY, which read a range's 2-D shape to
 // serialize it canonically (ADR 0011 §3). ok is false for any other name.
 func (r resolver) evalDigest(name funcName, args []tsvt.Expr) (Value, boolResult) {
 	switch name {
-	case "digest":
+	case fnDigest:
 		return r.digestRange(args), true
 	case "verify":
 		return r.verifyRange(args), true

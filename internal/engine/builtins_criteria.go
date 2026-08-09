@@ -11,7 +11,7 @@ import (
 // with a criterion. ok is false for any other name.
 func (r resolver) evalCriteria(name funcName, args []tsvt.Expr) (Value, boolResult) {
 	switch name {
-	case "countif":
+	case fnCountif:
 		return r.criteriaCount(args), true
 	case "sumif":
 		return r.criteriaSum(args, false), true
@@ -23,14 +23,13 @@ func (r resolver) evalCriteria(name funcName, args []tsvt.Expr) (Value, boolResu
 }
 
 // isCriteria reports whether name is one of the conditional-aggregate builtins.
-func isCriteria(name funcName) boolResult {
-	switch name {
-	case "countif", "sumif", "averageif":
-		return true
-	default:
-		return false
-	}
-}
+func isCriteria(name funcName) boolResult { return isAmong(name, criteriaFns) }
+
+// criteriaFns are the lazily-dispatched criteria builtins.
+// fnCountif names the counting criteria builtin.
+const fnCountif = "countif"
+
+var criteriaFns = []funcName{fnCountif, "sumif", "averageif"}
 
 // criteriaCount implements COUNTIF(range, criterion).
 func (r resolver) criteriaCount(args []tsvt.Expr) Value {

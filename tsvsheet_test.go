@@ -3,6 +3,7 @@ package tsvsheet_test
 import (
 	"bytes"
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 
@@ -266,4 +267,17 @@ func TestCensus_FacadePreflight(t *testing.T) {
 	census, err := tsvsheet.Census(tsvsheet.ByteSource{ReadAt: bytes.NewReader([]byte(src)), Size: int64(len(src))})
 	require.NoError(t, err)
 	assert.Equal(t, tsvsheet.SheetCensus{Rows: 2, MaxWidth: 2, Cells: 3, Formulas: 1}, census)
+}
+
+// TestFunctionsFacade pins the public catalog: enumerable, sorted, carrying a
+// known member, and excluding the uncallable meta function `named` —
+// the surface an editor's completion reads.
+func TestFunctionsFacade(t *testing.T) {
+	t.Parallel()
+
+	fns := tsvsheet.Functions()
+	require.NotEmpty(t, fns)
+	assert.True(t, slices.IsSorted(fns))
+	assert.Contains(t, fns, tsvsheet.FunctionName("sum"))
+	assert.NotContains(t, fns, tsvsheet.FunctionName("named"))
 }

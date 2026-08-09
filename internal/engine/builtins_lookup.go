@@ -14,7 +14,7 @@ func (r resolver) evalTable(name funcName, args []tsvt.Expr) (Value, boolResult)
 		return r.tableIndex(args), true
 	case "match":
 		return r.tableMatch(args), true
-	case "vlookup":
+	case fnVlookup:
 		return r.tableLookup(args, true), true
 	case "hlookup":
 		return r.tableLookup(args, false), true
@@ -24,14 +24,13 @@ func (r resolver) evalTable(name funcName, args []tsvt.Expr) (Value, boolResult)
 }
 
 // isTable reports whether name is one of the range-shaped lookup builtins.
-func isTable(name funcName) boolResult {
-	switch name {
-	case "rows", "columns", "index", "match", "vlookup", "hlookup":
-		return true
-	default:
-		return false
-	}
-}
+func isTable(name funcName) boolResult { return isAmong(name, tableFns) }
+
+// tableFns are the lazily-dispatched table and lookup builtins.
+// fnVlookup names the vertical lookup builtin.
+const fnVlookup = "vlookup"
+
+var tableFns = []funcName{"rows", "columns", "index", "match", fnVlookup, "hlookup"}
 
 // indexArg reads an argument as a 1-based integer index.
 func (r resolver) indexArg(arg tsvt.Expr) (charPos, Value) {

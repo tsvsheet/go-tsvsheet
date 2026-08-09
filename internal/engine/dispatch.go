@@ -68,14 +68,10 @@ func (r resolver) evalConditional(name funcName, args []tsvt.Expr) (Value, boolR
 }
 
 // isConditional reports whether name is one of the lazy conditional builtins.
-func isConditional(name funcName) boolResult {
-	switch name {
-	case "if", "ifs", "iferror", "ifna", "switch":
-		return true
-	default:
-		return false
-	}
-}
+func isConditional(name funcName) boolResult { return isAmong(name, conditionalFns) }
+
+// conditionalFns are the lazily-evaluated branch builtins.
+var conditionalFns = []funcName{"if", "ifs", "iferror", "ifna", "switch"}
 
 // evalInspector handles the single-argument inspectors (`IS*`, `N`, `TYPE`): it
 // evaluates the argument (observing an error or empty result) and applies the
@@ -121,7 +117,7 @@ func (r resolver) evalText(name funcName, args []tsvt.Expr) (Value, boolResult) 
 		return r.evalRept(args), true
 	case "concat":
 		return r.evalConcat(args), true
-	case "textjoin":
+	case fnTextjoin:
 		return r.evalTextJoin(args), true
 	default:
 		return Value{}, false
@@ -130,9 +126,13 @@ func (r resolver) evalText(name funcName, args []tsvt.Expr) (Value, boolResult) 
 
 // isText reports whether name is a lazily-dispatched text builtin — the set
 // evalText owns. Check consults it so the checker and the evaluator agree.
-func isText(name funcName) boolResult {
-	return name == "rept" || name == "concat" || name == "textjoin"
-}
+func isText(name funcName) boolResult { return isAmong(name, textLazyFns) }
+
+// textLazyFns are the byte-budgeted text builtins dispatched lazily.
+// fnTextjoin names the delimited join builtin.
+const fnTextjoin = "textjoin"
+
+var textLazyFns = []funcName{"rept", "concat", fnTextjoin}
 
 // evalConcat evaluates CONCAT(text…) — every operand's text, flattened ranges
 // included, joined with no separator — under the byte budget.

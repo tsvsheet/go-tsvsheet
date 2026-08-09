@@ -17,7 +17,7 @@ func (r resolver) evalArray(name funcName, args []tsvt.Expr) (Value, boolResult)
 		return r.arrayTranspose(args), true
 	case "unique":
 		return r.arrayUnique(args), true
-	case "sort":
+	case fnSort:
 		return r.arraySort(args), true
 	case "filter":
 		return r.arrayFilter(args), true
@@ -29,14 +29,15 @@ func (r resolver) evalArray(name funcName, args []tsvt.Expr) (Value, boolResult)
 }
 
 // isArray reports whether name is one of the dynamic-array builtins.
-func isArray(name funcName) boolResult {
-	switch name {
-	case "sequence", "transpose", "unique", "sort", "filter", "flatten":
-		return true
-	default:
-		return false
-	}
-}
+func isArray(name funcName) boolResult { return isAmong(name, arrayFns) }
+
+// arrayFns are the lazily-dispatched array builtins; the catalog and the
+// predicate read the same list, so neither can drift.
+// fnSort names the sort builtin, shared by its dispatch case and the family
+// list.
+const fnSort = "sort"
+
+var arrayFns = []funcName{"sequence", "transpose", "unique", fnSort, "filter", "flatten"}
 
 // arraySequence generates rows×cols consecutive numbers from 1: SEQUENCE(rows,
 // [cols]).

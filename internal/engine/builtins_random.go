@@ -63,9 +63,10 @@ const (
 )
 
 // isVolatileFn reports whether name is the volatile wrapper.
-func isVolatileFn(name funcName) boolResult {
-	return name == fnVolatile
-}
+func isVolatileFn(name funcName) boolResult { return isAmong(name, volatileFns) }
+
+// volatileFns is the volatility wrapper.
+var volatileFns = []funcName{fnVolatile}
 
 // evalVolatile evaluates volatile(expr[, schedule]): it returns expr's value
 // verbatim — transparent to scalars, arrays, and errors alike — so its only
@@ -82,14 +83,10 @@ func (r resolver) evalVolatile(name funcName, args []tsvt.Expr) (Value, boolResu
 }
 
 // isRandom reports whether name is one of the pass-state generator builtins.
-func isRandom(name funcName) boolResult {
-	switch name {
-	case fnRand, fnRandom, fnRandbetween, fnRandarray, fnTick, fnFrame:
-		return true
-	default:
-		return false
-	}
-}
+func isRandom(name funcName) boolResult { return isAmong(name, randomFns) }
+
+// randomFns are the pass-seeded draw and counter builtins.
+var randomFns = []funcName{fnRand, fnRandom, fnRandbetween, fnRandarray, fnTick, fnFrame}
 
 // evalRandom dispatches the generator builtins, which read the pass PRNG or the
 // pass ordinal. ok is false for any other name.

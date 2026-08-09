@@ -230,3 +230,15 @@ func TestNames_WindowedBindingReadFailureIsAnError(t *testing.T) {
 	_, err = windowed.ComputeRows(301, 1, engine.ComputeOptions{Limits: windowedLimits()})
 	assert.ErrorIs(t, err, constants.ErrReadInput)
 }
+
+// TestNames_SheetNamesListsDeclarations states the editor-facing list: names
+// in binding order, declared spelling, one entry per identity however many
+// cells duplicate it.
+func TestNames_SheetNamesListsDeclarations(t *testing.T) {
+	t.Parallel()
+
+	s, err := engine.Parse([]byte("=1 |@ named(Rate)\t=2 |@ named(zeta)\n=3 |@ named(RATE)\n"))
+	require.NoError(t, err)
+	assert.Equal(t, []string{"Rate", "zeta"}, s.Names(),
+		"binding order, declared spelling, the case-variant duplicate folded")
+}

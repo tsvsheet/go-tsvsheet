@@ -88,6 +88,9 @@ type Path = engine.Path
 // Sheet is a parsed spreadsheet grid of literal and formula cells.
 type Sheet = engine.Sheet
 
+// FunctionName is one builtin's canonical (lowercase) name.
+type FunctionName = engine.FunctionName
+
 // Span is a rectangular reference target resolved to 0-based addresses: a single
 // cell (From == To) or a range (From is the top-left, To the bottom-right as
 // written). It is the projection a frontend highlights.
@@ -169,6 +172,12 @@ func ParseAddress(s AddressText) (Address, error) { return engine.ParseAddress(s
 // call. Syntax errors are already rejected by Parse, and every reference the
 // narrowed grammar admits is a valid A1 form, so Check never reports those.
 func Check(s Sheet) []Diagnostic { return engine.Check(s) }
+
+// Functions lists every callable builtin, lowercase and sorted — the
+// enumerable catalog an editor's completion or a documentation generator
+// reads. The meta function `named` is deliberately absent: it is not callable
+// (SPECIFICATION §5.6).
+func Functions() []FunctionName { return engine.Functions() }
 
 // ReadTSV reads a tab-separated value grid. Rows are newline-separated; a
 // trailing newline does not add an empty row. Full-line comments are skipped

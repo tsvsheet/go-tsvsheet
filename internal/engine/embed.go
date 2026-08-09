@@ -81,7 +81,7 @@ func newEmbedComputer(s Sheet, now time.Time, env embedEnv, limits Limits, fetch
 // ordinary identity function). ok is false for any other name.
 func (r resolver) evalEmbed(name funcName, args []tsvt.Expr) (Value, boolResult) {
 	switch name {
-	case "sheet":
+	case fnSheet:
 		return r.evalSheet(args), true
 	case "input":
 		return r.evalInput(args), true
@@ -90,9 +90,14 @@ func (r resolver) evalEmbed(name funcName, args []tsvt.Expr) (Value, boolResult)
 }
 
 // isEmbed reports whether name is a lazily-dispatched cross-sheet builtin.
-func isEmbed(name funcName) boolResult {
-	return boolResult(name == "sheet" || name == "input")
-}
+func isEmbed(name funcName) boolResult { return isAmong(name, embedFns) }
+
+// embedFns are the sheet-composition builtins ("output" is an ordinary
+// identity function in the eager registry).
+// fnSheet names the sheet-embedding builtin.
+const fnSheet = "sheet"
+
+var embedFns = []funcName{fnSheet, "input"}
 
 // evalInput resolves INPUT(n) to the nth (1-based) argument the embedding
 // SHEET(...) call passed; out of range, or in a sheet that was not embedded, is
@@ -185,7 +190,7 @@ func (s Sheet) EmbeddedGrid(at Address, opts ComputeOptions) (Path, Grid, bool) 
 // returns it.
 func topLevelSheetCall(expr tsvt.Expr) (tsvt.Call, boolResult) {
 	call, ok := expr.(tsvt.Call)
-	return call, boolResult(ok && strings.EqualFold(call.Name, "sheet"))
+	return call, boolResult(ok && strings.EqualFold(call.Name, fnSheet))
 }
 
 // embed computes sub as a child sheet (carrying inputs for its INPUT calls and

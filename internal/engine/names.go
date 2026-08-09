@@ -150,6 +150,19 @@ func bindRow(names nameBindings, cells [][]cell, row rowIndex) nameBindings {
 	return names
 }
 
+// Names lists the sheet's declared value names in binding order (row-major),
+// each in its declared spelling — what an editor's @-completion offers. A
+// duplicated name appears once, first spelling; the duplicate itself is
+// Check's finding, not this list's.
+func (s Sheet) Names() []string {
+	bindings := collectBindings(s.rowsView())
+	names := make([]string, 0, len(bindings.at))
+	for _, id := range sortedNames(bindings.at) {
+		names = append(names, string(bindings.at[id].spelled))
+	}
+	return names
+}
+
 // collectBindings walks a resident sheet's cells for declarations, in
 // row-major order. One pass per computer, the same order of work as the
 // compute pass that follows it.

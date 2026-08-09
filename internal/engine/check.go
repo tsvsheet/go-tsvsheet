@@ -47,9 +47,11 @@ func unknownFunctions(expr tsvt.Expr, at Address) []Diagnostic {
 }
 
 // isClock reports whether name is a volatile clock builtin.
-func isClock(name funcName) boolResult {
-	return name == fnToday || name == fnNow || name == fnIsnow
-}
+func isClock(name funcName) boolResult { return isAmong(name, clockFns) }
+
+// clockFns are the clock builtins (pure by themselves; volatile only inside
+// volatile(…), R4).
+var clockFns = []funcName{fnToday, fnNow, fnIsnow}
 
 // lazyNamePredicates are the lazy-dispatch name predicates isKnownFunc
 // consults. Every lazy dispatcher of resolver.lazyDispatchers must be
