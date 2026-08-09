@@ -251,3 +251,15 @@ func TestFormatValueScalarContext(t *testing.T) {
 	require.NoError(t, err)
 	want.Equal("free-standing", tsvsheet.FormatValue(lit.Eval(nil, tsvsheet.ComputeOptions{})))
 }
+
+// TestCompileExprRefusesAMetaClause states the bare-expression boundary:
+// `named` binds the cell a formula is written in, and a detached expression
+// has no cell — so the clause is ErrSyntax here, with the reason in the
+// message rather than a bare parse failure.
+func TestCompileExprRefusesAMetaClause(t *testing.T) {
+	t.Parallel()
+
+	_, err := tsvsheet.CompileExpr([]byte(`sum(A1:A5) |@ named(Total)`))
+	require.ErrorIs(t, err, tsvsheet.ErrSyntax)
+	assert.Contains(t, err.Error(), "bare expression has none")
+}

@@ -112,3 +112,31 @@ func TestTraceImportReportsTheSourceExactlyAsTheSheetWroteIt(t *testing.T) {
 	assert.Equal(t, source, trace.Imports[0].Source, "the source is reported as written, not as resolved")
 	assert.NotEmpty(t, trace.Imports[0].Error, "and the reason the cell cannot show is here")
 }
+
+// TestExplainNamedInputs kills the adversary's MEDIUM finding: a formula
+// reading a name AND a reference must trace BOTH inputs with their values — a
+// name is an input edge like any reference, and a trace showing one and hiding
+// the other answers "why is this cell wrong" with half the inputs.
+func TestExplainNamedInputs(t *testing.T) {
+	t.Parallel()
+
+	sheet := parse(t, "=0.08 |@ named(Rate)\t=@Rate * B2\n\t100\n")
+	trace, err := engine.Explain(sheet, engine.Address{Row: 0, Col: 1})
+	require.NoError(t, err)
+	assert.Equal(t, "8", trace.Value)
+	assert.Equal(t, []engine.TraceInput{
+		{Ref: "B2", Value: "100"},
+		{Ref: "@Rate", Value: "0.08"},
+	}, trace.Inputs)
+}
+
+// TestExplainShowsTheMetaClause kills the adversary's surviving mutation M9:
+// the trace's formula is the cell's WHOLE formula, meta clause included — a
+// hover on a named cell that hid its own name would be a partial truth.
+func TestExplainShowsTheMetaClause(t *testing.T) {
+	t.Parallel()
+
+	trace, err := engine.Explain(parse(t, "=1 + 1 |@ named(Total)\n"), engine.Address{Row: 0, Col: 0})
+	require.NoError(t, err)
+	assert.Equal(t, "1 + 1 |@ named(Total)", trace.Formula)
+}

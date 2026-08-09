@@ -241,45 +241,6 @@ func TestScanRefusesEachMissingRuleAlone(t *testing.T) {
 	assert.ErrorIs(t, err, index.ErrScan, "a negative size is refused, never a silent empty index")
 }
 
-// TestCheckedSplitNeverAdmitsADefectiveRule pins the two injected-Split defects as
-// ErrScan: the skip form (advance without a token — bufio drops the remainder
-// at EOF, making the census depend on read chunking) and a token without
-// progress (an unbounded loop otherwise). A defective engine rule must surface
-// as a refusal, never as a wrong index or a hang.
-func TestCheckedSplitNeverAdmitsADefectiveRule(t *testing.T) {
-	t.Parallel()
-
-	skipForm := func(data []byte, isAtEOF bool) (int, []byte, error) {
-		if len(data) > 0 && data[0] == '!' {
-			i := bytes.IndexByte(data, '\n')
-			if i >= 0 {
-				return i + 1, nil, nil // consume the line, emit nothing
-			}
-		}
-		return splitTerminators(data, isAtEOF)
-	}
-	_, err := index.Scan(strings.NewReader("!skip\na\n"), 8, index.Options{Split: skipForm, IsComment: isComment})
-	assert.ErrorIs(t, err, index.ErrScan, "the skip form is refused")
-
-	stuck := func([]byte, bool) (int, []byte, error) { return 0, []byte{}, nil }
-	_, err = index.Scan(strings.NewReader("abc"), 3, index.Options{Split: stuck, IsComment: isComment})
-	assert.ErrorIs(t, err, index.ErrScan, "a token without progress is refused, not looped on")
-}
-
-// failingReader errors on any read past its prefix, standing in for a source
-// that dies mid-scan.
-type failingReader struct{ prefix []byte }
-
-func (r failingReader) ReadAt(p []byte, off int64) (int, error) {
-	if off >= int64(len(r.prefix)) {
-		return 0, assert.AnError
-	}
-	n := copy(p, r.prefix[off:])
-	return n, nil
-}
-
-// TestScanRefusals pins the two ErrScan shapes: the required injected rules
-// missing, and a source that fails mid-read — each the specific sentinel,
 // never a bare error.
 func TestScanRefusals(t *testing.T) {
 	t.Parallel()

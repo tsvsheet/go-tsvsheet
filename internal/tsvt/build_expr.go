@@ -36,9 +36,12 @@ func buildExpr(ctx grammar.IExpressionContext) (Expr, error) {
 	}
 }
 
-// buildLeaf builds a literal-leaf expression (number, string, boolean, error).
+// buildLeaf builds a leaf operand: a literal (number, string, boolean, error)
+// or a `@name` reference, whose leading sigil byte is stripped.
 func buildLeaf(ctx grammar.IExpressionContext) Expr {
 	switch c := ctx.(type) {
+	case *grammar.NameRefExprContext:
+		return NameRef{Name: NameText(c.NAMEREF().GetText()[1:])}
 	case *grammar.NumberExprContext:
 		return Number{Text: c.NUMBER().GetText()}
 	case *grammar.StringExprContext:

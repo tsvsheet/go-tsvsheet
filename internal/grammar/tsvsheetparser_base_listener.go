@@ -20,6 +20,24 @@ func (s *BaseTsvsheetParserListener) EnterEveryRule(ctx antlr.ParserRuleContext)
 // ExitEveryRule is called when any rule is exited.
 func (s *BaseTsvsheetParserListener) ExitEveryRule(ctx antlr.ParserRuleContext) {}
 
+// EnterFormula is called when production formula is entered.
+func (s *BaseTsvsheetParserListener) EnterFormula(ctx *FormulaContext) {}
+
+// ExitFormula is called when production formula is exited.
+func (s *BaseTsvsheetParserListener) ExitFormula(ctx *FormulaContext) {}
+
+// EnterMetaClause is called when production metaClause is entered.
+func (s *BaseTsvsheetParserListener) EnterMetaClause(ctx *MetaClauseContext) {}
+
+// ExitMetaClause is called when production metaClause is exited.
+func (s *BaseTsvsheetParserListener) ExitMetaClause(ctx *MetaClauseContext) {}
+
+// EnterMetaArgs is called when production metaArgs is entered.
+func (s *BaseTsvsheetParserListener) EnterMetaArgs(ctx *MetaArgsContext) {}
+
+// ExitMetaArgs is called when production metaArgs is exited.
+func (s *BaseTsvsheetParserListener) ExitMetaArgs(ctx *MetaArgsContext) {}
+
 // EnterErrorExpr is called when production errorExpr is entered.
 func (s *BaseTsvsheetParserListener) EnterErrorExpr(ctx *ErrorExprContext) {}
 
@@ -61,6 +79,12 @@ func (s *BaseTsvsheetParserListener) EnterUnaryExpr(ctx *UnaryExprContext) {}
 
 // ExitUnaryExpr is called when production unaryExpr is exited.
 func (s *BaseTsvsheetParserListener) ExitUnaryExpr(ctx *UnaryExprContext) {}
+
+// EnterNameRefExpr is called when production nameRefExpr is entered.
+func (s *BaseTsvsheetParserListener) EnterNameRefExpr(ctx *NameRefExprContext) {}
+
+// ExitNameRefExpr is called when production nameRefExpr is exited.
+func (s *BaseTsvsheetParserListener) ExitNameRefExpr(ctx *NameRefExprContext) {}
 
 // EnterAddExpr is called when production addExpr is entered.
 func (s *BaseTsvsheetParserListener) EnterAddExpr(ctx *AddExprContext) {}

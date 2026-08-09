@@ -28,6 +28,7 @@ func FuzzParseDocument(f *testing.F) {
 	f.Add([]byte("a\tb\n=A1+1\t2\n"))
 	f.Add([]byte("#. hidden\tB\n# note\n=sum(A1:B2)\t#REF!\n"))
 	f.Add([]byte("\t\n\t=DEJTLX1\n"))
+	f.Add([]byte("=1 |@ named(Rate)\t=@Rate * 2\n=@rate\t=\"a|@b\"\n"))
 	f.Fuzz(func(t *testing.T, data []byte) {
 		d, err := tsvsheet.ParseDocument(data)
 		if err != nil {
@@ -72,6 +73,7 @@ func FuzzCompileExpr(f *testing.F) {
 	f.Add("sum(A1:B2) | round(2)")
 	f.Add(`if(A1 >= 1, "y", #N/A)`)
 	f.Add("rand() + randbetween(1, 9)")
+	f.Add("@Total * 2 |@ named(Tax)")
 	f.Add("sum(A1:A50000000000)")
 	f.Fuzz(func(t *testing.T, src string) {
 		expr, err := tsvsheet.CompileExpr([]byte(src))

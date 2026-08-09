@@ -76,3 +76,24 @@ func TestCheck_KnowsVolatileAndGenerators(t *testing.T) {
 	s := parse(t, "=volatile(rand())\t=randbetween(1,6)\t=randarray(2,2)\t=tick()\t=frame()\n")
 	assert.Empty(t, engine.Check(s))
 }
+
+// TestVolatileSchedules_DerivedLegs states the derived-schedule reader's
+// refusals: no argument, a non-call argument, a non-isnow call, and an isnow
+// whose pattern is not a literal each derive no pattern — the cell stays
+// volatile at the DEFAULT cadence, which VolatileSchedules reports as the
+// empty schedule, never a guessed pattern.
+func TestVolatileSchedules_DerivedLegs(t *testing.T) {
+	t.Parallel()
+	for name, src := range map[string]string{
+		"no argument":         "=volatile()\n",
+		"non-call argument":   "=volatile(A1)\n",
+		"non-isnow call":      "=volatile(abs(1))\n",
+		"non-literal pattern": "=volatile(isnow(A1))\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, []string{""}, parse(t, src).VolatileSchedules(),
+				"volatile with no derivable pattern is the default cadence")
+		})
+	}
+}

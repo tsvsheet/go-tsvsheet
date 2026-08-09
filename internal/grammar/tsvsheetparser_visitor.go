@@ -7,6 +7,15 @@ import "github.com/antlr4-go/antlr/v4"
 type TsvsheetParserVisitor interface {
 	antlr.ParseTreeVisitor
 
+	// Visit a parse tree produced by TsvsheetParser#formula.
+	VisitFormula(ctx *FormulaContext) interface{}
+
+	// Visit a parse tree produced by TsvsheetParser#metaClause.
+	VisitMetaClause(ctx *MetaClauseContext) interface{}
+
+	// Visit a parse tree produced by TsvsheetParser#metaArgs.
+	VisitMetaArgs(ctx *MetaArgsContext) interface{}
+
 	// Visit a parse tree produced by TsvsheetParser#errorExpr.
 	VisitErrorExpr(ctx *ErrorExprContext) interface{}
 
@@ -27,6 +36,9 @@ type TsvsheetParserVisitor interface {
 
 	// Visit a parse tree produced by TsvsheetParser#unaryExpr.
 	VisitUnaryExpr(ctx *UnaryExprContext) interface{}
+
+	// Visit a parse tree produced by TsvsheetParser#nameRefExpr.
+	VisitNameRefExpr(ctx *NameRefExprContext) interface{}
 
 	// Visit a parse tree produced by TsvsheetParser#addExpr.
 	VisitAddExpr(ctx *AddExprContext) interface{}

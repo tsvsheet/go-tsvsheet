@@ -31,7 +31,7 @@ func Check(s Sheet) []Diagnostic {
 			}
 		}
 	}
-	return diags
+	return append(diags, nameDiagnostics(s)...)
 }
 
 // unknownFunctions flags each call to a name outside the builtin set.
@@ -60,9 +60,15 @@ var lazyNamePredicates = []func(funcName) boolResult{
 }
 
 // isKnownFunc reports whether name (case-insensitive) is a builtin: an eager
-// registry function, a lazily-dispatched builtin, or a value predicate.
+// registry function, a lazily-dispatched builtin, a value predicate, or the
+// meta function — which is known to the language even though it is not
+// callable, so a misplaced `named` gets the meta-misuse diagnostic
+// (check_names.go) rather than a misleading "unknown function".
 func isKnownFunc(name funcName) boolResult {
 	lower := funcName(strings.ToLower(string(name)))
+	if isMetaFn(lower) {
+		return true
+	}
 	for _, isLazyName := range lazyNamePredicates {
 		if isLazyName(lower) {
 			return true

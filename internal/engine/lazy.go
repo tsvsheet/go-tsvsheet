@@ -42,8 +42,9 @@ func (l lazyCells) at(row rowIndex, col colIndex) (cell, boolResult) {
 // carry; every value copy shares the latch through its pointer. Constructed
 // directly — newComputer's dense memo sizes slabs by the grid height, which on
 // a windowed document is the very allocation this path exists to avoid.
-func (l lazyCells) computer(limits Limits, opts ComputeOptions) computer {
+func (l lazyCells) computer(names nameBindings, limits Limits, opts ComputeOptions) computer {
 	return computer{
+		names:   names,
 		now:     opts.At,
 		rng:     newPassRNG(prngSeed(opts.At.UnixNano())),
 		sheet:   Sheet{lazy: &l},

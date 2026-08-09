@@ -12,7 +12,7 @@ import (
 // parse builds the AST of a formula, failing the test on a syntax error.
 func parse(t *testing.T, src string) Expr {
 	t.Helper()
-	e, err := ParseFormula(FormulaText(src))
+	e, _, err := ParseFormula(FormulaText(src))
 	require.NoError(t, err)
 	return e
 }
@@ -168,7 +168,7 @@ func TestBuild_PipeSyntaxErrors(t *testing.T) {
 	for _, src := range []string{"A1 |", "A1 | 5", "A1 | (len())", "| len()"} {
 		t.Run(src, func(t *testing.T) {
 			t.Parallel()
-			_, err := ParseFormula(FormulaText(src))
+			_, _, err := ParseFormula(FormulaText(src))
 			require.Error(t, err)
 			assert.ErrorIs(t, err, constants.ErrSyntax)
 		})
@@ -182,7 +182,7 @@ func TestBuild_PipeOperandErrors(t *testing.T) {
 	for _, src := range []string{"B2.5 | len()", "A1 | round(B2.5)"} {
 		t.Run(src, func(t *testing.T) {
 			t.Parallel()
-			_, err := ParseFormula(FormulaText(src))
+			_, _, err := ParseFormula(FormulaText(src))
 			require.Error(t, err)
 			assert.ErrorIs(t, err, constants.ErrSyntax)
 		})
@@ -196,7 +196,7 @@ func TestBuild_FractionalRowRejected(t *testing.T) {
 	for _, src := range []string{"B2.5", "-B2.5", "B2.5%", "B2.5 + 1", "1 + B2.5", "sum(B2.5)", "A1:C3.5"} {
 		t.Run(src, func(t *testing.T) {
 			t.Parallel()
-			_, err := ParseFormula(FormulaText(src))
+			_, _, err := ParseFormula(FormulaText(src))
 			require.Error(t, err)
 			assert.ErrorIs(t, err, constants.ErrSyntax)
 		})
@@ -210,7 +210,7 @@ func TestBuild_FractionalRowRejected(t *testing.T) {
 func TestBuildPipe_EvaluationNeverSeesAPipe(t *testing.T) {
 	t.Parallel()
 
-	expr, err := ParseFormula(FormulaText("x | f(a)"))
+	expr, _, err := ParseFormula(FormulaText("x | f(a)"))
 	require.NoError(t, err)
 
 	call, isCall := expr.(Call)
@@ -221,7 +221,7 @@ func TestBuildPipe_EvaluationNeverSeesAPipe(t *testing.T) {
 
 	// And the invariant Call's own doc states: a piped call always has at least
 	// one argument, because the desugar prepends one.
-	bare, err := ParseFormula(FormulaText("x | f"))
+	bare, _, err := ParseFormula(FormulaText("x | f"))
 	require.NoError(t, err)
 	if piped, ok := bare.(Call); ok && piped.IsPiped {
 		assert.NotEmpty(t, piped.Args, "a piped call is never argument-less")

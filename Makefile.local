@@ -14,7 +14,7 @@ VET_PKGS = $(shell go list ./... | grep -v /internal/grammar)
 # sibling checkout, no submodule. The parser is committed so ordinary builds stay
 # Docker-free; run this only to adopt a new grammar version by bumping GRAMMAR_REF
 # to a tsvsheet commit SHA (or tag, once the grammar repo publishes them).
-GRAMMAR_REF ?= 1f550a6e694f2b305c7ee307c07d3613f3e5b0e3
+GRAMMAR_REF ?= e1afc888ad3c2b810243a0a7493ed87ad9b6ab49
 .PHONY: grammars
 grammars: ## Regenerate internal/grammar from the pinned tsvsheet grammar (needs Docker)
 	GRAMMAR_REF=$(GRAMMAR_REF) ./scripts/regen-grammar.sh

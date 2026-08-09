@@ -71,7 +71,13 @@ func rebaseLine(row []cell, d offset) []cell {
 }
 
 // rebaseCell rebases one cell by d: a literal (or empty) cell copies verbatim;
-// a formula's references shift and the cell re-serializes canonically.
+// a formula's references shift and the cell re-serializes canonically. The
+// meta clause is deliberately absent from the result: rebaseCell is the COPY
+// path — fill, paste, duplication — and a copy takes the expression alone
+// (SPECIFICATION §5.6: copying a labelled thing does not copy the label —
+// TestNames_FillDropsTheClause, TestNames_PasteDropsTheClause,
+// TestNames_DuplicateRowDropsTheClause). The structural-shift path preserves
+// the clause, because there the cell moves rather than multiplies.
 func rebaseCell(cl cell, d offset) cell {
 	if !cl.isFormula() {
 		return cl

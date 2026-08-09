@@ -7,6 +7,18 @@ type BaseTsvsheetParserVisitor struct {
 	*antlr.BaseParseTreeVisitor
 }
 
+func (v *BaseTsvsheetParserVisitor) VisitFormula(ctx *FormulaContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseTsvsheetParserVisitor) VisitMetaClause(ctx *MetaClauseContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseTsvsheetParserVisitor) VisitMetaArgs(ctx *MetaArgsContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseTsvsheetParserVisitor) VisitErrorExpr(ctx *ErrorExprContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -32,6 +44,10 @@ func (v *BaseTsvsheetParserVisitor) VisitStringExpr(ctx *StringExprContext) inte
 }
 
 func (v *BaseTsvsheetParserVisitor) VisitUnaryExpr(ctx *UnaryExprContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseTsvsheetParserVisitor) VisitNameRefExpr(ctx *NameRefExprContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 

@@ -57,7 +57,14 @@ type sheetSource struct {
 // that an unbounded windowed cache re-materializes the whole file under
 // scrolling.
 func newSheetSource(src readerAtSize, capacity index.CellCount) (sheetSource, error) {
-	ix, err := index.Scan(src.at, src.size, indexOptions())
+	opts := indexOptions()
+	// The scan also marks candidate declaration rows (any line carrying the
+	// meta marker's bytes), capped at the same capacity that bounds the cache:
+	// one ceiling (R16), and the windowed bindings pass reads only these rows.
+	// A false candidate — the marker inside a string literal — parses to no
+	// clause and binds nothing.
+	opts.Mark, opts.MaxMarks = []byte(metaMarker), capacity
+	ix, err := index.Scan(src.at, src.size, opts)
 	if err != nil {
 		return sheetSource{}, readFailure(err)
 	}

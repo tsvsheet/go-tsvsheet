@@ -17,22 +17,33 @@ import (
 // because the computer is copied by value. tick is the injected recompute-pass
 // ordinal read by tick()/frame().
 type computer struct {
+	env     embedEnv
 	now     time.Time
 	memo    memo
 	fetcher Fetcher
 	rng     passRNG
-	env     embedEnv
+	names   nameBindings
 	sheet   Sheet
 	limits  Limits
 	tick    Tick
 }
 
-// newComputer builds a computer sized to the sheet, with the pass clock and the
-// engine's generous DefaultLimits (the plain Compute/ComputeAt path); the
-// embedding path (ComputeWith) overrides them with the injected limits.
+// newComputer builds a computer sized to the sheet, with the pass clock, the
+// engine's generous DefaultLimits (the plain Compute/ComputeAt path; the
+// embedding path overrides them with the injected limits), and the sheet's
+// name bindings collected up front — so an embedded or foreign sub-sheet's
+// computer carries that sheet's own names and no other's, which is what makes
+// names sheet-local (SPECIFICATION §5.6) without a scoping mechanism.
 func newComputer(s Sheet, now time.Time) computer {
 	rng := newPassRNG(prngSeed(now.UnixNano()))
-	return computer{now: now, rng: rng, sheet: s, memo: newDenseMemo(s), limits: DefaultLimits()}
+	return computer{
+		now:    now,
+		rng:    rng,
+		sheet:  s,
+		names:  collectBindings(s.rowsView()),
+		memo:   newDenseMemo(s),
+		limits: DefaultLimits(),
+	}
 }
 
 // cellValue is a cell's evaluated Value: a literal parsed, a formula computed
@@ -113,6 +124,20 @@ func (r resolver) resolveOperand(ref tsvt.Reference) cellset {
 		return r.resolveSingle(rangeRef.From)
 	}
 	return r.resolveMatrix(rangeRef.From, *rangeRef.To)
+}
+
+// resolveName resolves a `@name` reference (SPECIFICATION §5.6): the binding
+// cell's value, read through the same memoized path a cell reference takes —
+// which is what makes a name in its own binding cell an ordinary #CIRC! and a
+// name's dependency edge indistinguishable from a reference's. An unbound or
+// duplicated name is #NAME?; a windowed source whose declarations exceeded the
+// budget is #LIMIT!.
+func (r resolver) resolveName(ref tsvt.NameRef) Value {
+	at, refusal := r.comp.names.resolve(ref.Name)
+	if refusal != "" {
+		return errorValue(refusal)
+	}
+	return r.comp.read(rowIndex(at.Row), colIndex(at.Col))
 }
 
 // resolveSingle resolves a single-cell reference; an unaddressable position

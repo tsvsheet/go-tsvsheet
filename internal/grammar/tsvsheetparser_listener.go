@@ -7,6 +7,15 @@ import "github.com/antlr4-go/antlr/v4"
 type TsvsheetParserListener interface {
 	antlr.ParseTreeListener
 
+	// EnterFormula is called when entering the formula production.
+	EnterFormula(c *FormulaContext)
+
+	// EnterMetaClause is called when entering the metaClause production.
+	EnterMetaClause(c *MetaClauseContext)
+
+	// EnterMetaArgs is called when entering the metaArgs production.
+	EnterMetaArgs(c *MetaArgsContext)
+
 	// EnterErrorExpr is called when entering the errorExpr production.
 	EnterErrorExpr(c *ErrorExprContext)
 
@@ -27,6 +36,9 @@ type TsvsheetParserListener interface {
 
 	// EnterUnaryExpr is called when entering the unaryExpr production.
 	EnterUnaryExpr(c *UnaryExprContext)
+
+	// EnterNameRefExpr is called when entering the nameRefExpr production.
+	EnterNameRefExpr(c *NameRefExprContext)
 
 	// EnterAddExpr is called when entering the addExpr production.
 	EnterAddExpr(c *AddExprContext)
@@ -94,6 +106,15 @@ type TsvsheetParserListener interface {
 	// EnterOffset is called when entering the offset production.
 	EnterOffset(c *OffsetContext)
 
+	// ExitFormula is called when exiting the formula production.
+	ExitFormula(c *FormulaContext)
+
+	// ExitMetaClause is called when exiting the metaClause production.
+	ExitMetaClause(c *MetaClauseContext)
+
+	// ExitMetaArgs is called when exiting the metaArgs production.
+	ExitMetaArgs(c *MetaArgsContext)
+
 	// ExitErrorExpr is called when exiting the errorExpr production.
 	ExitErrorExpr(c *ErrorExprContext)
 
@@ -114,6 +135,9 @@ type TsvsheetParserListener interface {
 
 	// ExitUnaryExpr is called when exiting the unaryExpr production.
 	ExitUnaryExpr(c *UnaryExprContext)
+
+	// ExitNameRefExpr is called when exiting the nameRefExpr production.
+	ExitNameRefExpr(c *NameRefExprContext)
 
 	// ExitAddExpr is called when exiting the addExpr production.
 	ExitAddExpr(c *AddExprContext)

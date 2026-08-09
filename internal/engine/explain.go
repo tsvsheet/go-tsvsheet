@@ -64,7 +64,10 @@ func explainWith(s Sheet, at Address, newComp func() computer) (Trace, error) {
 	comp := newComp()
 	trace := Trace{Cell: at.String(), Value: comp.read(rowIndex(at.Row), colIndex(at.Col)).String()}
 	if cl.isFormula() {
-		trace.Formula = renderExpr(cl.formula)
+		// The trace shows the cell's WHOLE formula, meta clause included: a
+		// hover on a named cell that hid its own name would be a partial truth
+		// (TestExplainShowsTheMetaClause).
+		trace.Formula = renderExpr(cl.formula) + renderMeta(cl.meta)
 		trace.Inputs = traceInputs(comp, cl.formula)
 		trace.Imports = traceImports(comp, cl.formula)
 		trace.Notes = divergenceNotes(cl.formula)
@@ -116,12 +119,19 @@ func (r resolver) traceImport(arg tsvt.Expr, media MediaType) TraceImport {
 	return TraceImport{Source: source, URL: string(res.URL)}
 }
 
-// traceInputs renders each reference in the formula with its computed value.
+// traceInputs renders each input the formula reads — every A1 reference and
+// every `@name` — with its computed value, in source order within each kind. A
+// name IS an input edge (SPECIFICATION §7), so a trace that showed references
+// and hid names would answer "why is this cell wrong" with half the inputs
+// (TestExplainNamedInputs states both halves).
 func traceInputs(comp computer, expr tsvt.Expr) []TraceInput {
 	res := resolver{comp: comp}
 	var inputs []TraceInput
 	walkRefs(expr, func(ref tsvt.Reference) {
 		inputs = append(inputs, TraceInput{Ref: renderReference(ref), Value: traceValue(res.resolveOperand(ref))})
+	})
+	walkNames(expr, func(ref tsvt.NameRef) {
+		inputs = append(inputs, TraceInput{Ref: "@" + string(ref.Name), Value: res.resolveName(ref).String()})
 	})
 	return inputs
 }

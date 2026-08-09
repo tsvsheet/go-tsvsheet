@@ -100,6 +100,18 @@ type RefOperand struct {
 	Ref Reference
 }
 
+// NameText is a declared or referenced value name, spelled without its `@`
+// sigil. Name identity is case-insensitive, like function-name identity; the
+// spelling here is case-preserved for rendering.
+type NameText string
+
+// NameRef is a `@name` reference used as an expression operand
+// (SPECIFICATION §5.6): its value is the binding cell's computed value.
+type NameRef struct {
+	exprMarker
+	Name NameText
+}
+
 // Number is a numeric literal; Text preserves the source form.
 type Number struct {
 	exprMarker

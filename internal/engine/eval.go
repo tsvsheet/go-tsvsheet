@@ -16,6 +16,8 @@ func (r resolver) eval(expr tsvt.Expr) Value {
 		return errorValue(ErrorValue(e.Code))
 	case tsvt.RefOperand:
 		return r.resolveOperand(e.Ref).scalar()
+	case tsvt.NameRef:
+		return r.resolveName(e)
 	case tsvt.Unary:
 		return r.evalUnary(e)
 	case tsvt.Percent:

@@ -26,8 +26,12 @@ func (w WindowedSheet) ComputeRows(from, n int, opts ComputeOptions) (Grid, erro
 	if err != nil {
 		return nil, readFailure(err)
 	}
+	names, err := windowedBindings(w.source)
+	if err != nil {
+		return nil, readFailure(err)
+	}
 	lazy := newLazyCells(w.source)
-	comp := lazy.computer(effectiveLimits(opts.Limits), opts)
+	comp := lazy.computer(names, effectiveLimits(opts.Limits), opts)
 	out := make(Grid, len(rows))
 	for r, row := range rows {
 		out[r] = make([]string, len(row))

@@ -247,3 +247,36 @@ func TestShiftToExactlyTheLastAddressableColumnIsRendered(t *testing.T) {
 	got := parse(t, "=EFWFSWHTO1\n").InsertCol(addr(0, 0))
 	assert.Equal(t, "=EFWFSWHTP1", sourceAt(t, got, 0, 1))
 }
+
+// TestNames_StructuralInsertKeepsTheBinding is the feature's reason to exist:
+// insert a row above a named cell THROUGH THE ENGINE and every `@name` use
+// still reads the moved cell — no formula was rewritten, and the clause
+// survived the shift's re-serialization.
+func TestNames_StructuralInsertKeepsTheBinding(t *testing.T) {
+	t.Parallel()
+
+	s, err := engine.Parse([]byte("=42 |@ named(Answer)\n=@Answer\n"))
+	require.NoError(t, err)
+
+	shifted := s.InsertRow(engine.Address{Row: 0})
+	src := shifted.Source()
+	assert.Equal(t, "=42 |@ named(Answer)", src[1][0], "the clause survives the shift verbatim")
+
+	g := shifted.Compute()
+	assert.Equal(t, "42", g[2][0], "the use still resolves the moved binding")
+}
+
+// TestNames_StructuralShiftReserializesTheClause pins the shift path whose
+// re-serialization once rebuilt cell text from the expression alone: a cell
+// whose REFERENCES move must keep its clause — spelling included, a bare
+// `|@ named` staying bare — or an insertRow would silently unname it.
+func TestNames_StructuralShiftReserializesTheClause(t *testing.T) {
+	t.Parallel()
+
+	s, err := engine.Parse([]byte("seed\n=A1 |@ named(Tail)\n=A1 |@ named\n"))
+	require.NoError(t, err)
+
+	src := s.InsertRow(engine.Address{Row: 0}).Source()
+	assert.Equal(t, "=A2 |@ named(Tail)", src[2][0], "the reference shifted; the clause held")
+	assert.Equal(t, "=A2 |@ named", src[3][0], "the author's dropped parentheses survive")
+}

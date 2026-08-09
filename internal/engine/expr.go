@@ -1,6 +1,9 @@
 package engine
 
-import "github.com/tsvsheet/go-tsvsheet/internal/tsvt"
+import (
+	"github.com/tsvsheet/go-tsvsheet/internal/constants"
+	"github.com/tsvsheet/go-tsvsheet/internal/tsvt"
+)
 
 // Expr is one compiled bare expression — the text that would follow `=` in a
 // formula cell — detached from any sheet. It is an immutable value: compile
@@ -12,11 +15,18 @@ type Expr struct {
 
 // CompileExpr parses and compiles one bare expression (no leading `=`). A
 // malformed expression is constants.ErrSyntax carrying line/column detail.
-// Compilation is grid-independent; the result evaluates against any Grid.
+// Compilation is grid-independent; the result evaluates against any Grid. A
+// meta clause is refused: `named` binds the cell a formula is written in
+// (SPECIFICATION §5.6), and a bare expression has no cell to bind —
+// TestCompileExprRefusesAMetaClause states it.
 func CompileExpr(src []byte) (Expr, error) {
-	expr, err := tsvt.ParseFormula(tsvt.FormulaText(src))
+	expr, meta, err := tsvt.ParseFormula(tsvt.FormulaText(src))
 	if err != nil {
 		return Expr{}, err
+	}
+	if !meta.IsZero() {
+		return Expr{}, constants.ErrSyntax.With(nil,
+			"message", "a |@ meta clause names the cell a formula is written in; a bare expression has none")
 	}
 	return Expr{expr: expr}, nil
 }

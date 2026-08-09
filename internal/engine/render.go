@@ -21,6 +21,8 @@ func renderExpr(expr tsvt.Expr) string {
 		return e.Code
 	case tsvt.RefOperand:
 		return renderReference(e.Ref)
+	case tsvt.NameRef:
+		return "@" + string(e.Name)
 	case tsvt.Unary:
 		return string(e.Op) + operandParens(e.X, precUnary)
 	case tsvt.Percent:
@@ -30,6 +32,25 @@ func renderExpr(expr tsvt.Expr) string {
 	default: // tsvt.Call
 		return renderCall(expr.(tsvt.Call))
 	}
+}
+
+// renderMeta reconstructs a formula's trailing meta clause — ` |@ named(Total)`
+// — or nothing for the absent clause. The author's parenthesization survives
+// (HasParens), as the pipe spelling does through IsPiped, so a structural edit
+// re-serializing a cell keeps `|@ named` bare
+// (TestNames_StructuralShiftReserializesTheClause).
+func renderMeta(meta tsvt.MetaClause) string {
+	if meta.IsZero() {
+		return ""
+	}
+	if !meta.HasParens {
+		return " |@ " + meta.Fn
+	}
+	args := make([]string, len(meta.Args))
+	for i, arg := range meta.Args {
+		args[i] = string(arg)
+	}
+	return " |@ " + meta.Fn + "(" + strings.Join(args, ", ") + ")"
 }
 
 // precedence ranks a rendered expression by how tightly it binds; a higher rank

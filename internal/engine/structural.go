@@ -154,7 +154,11 @@ func rewriteCell(cl cell, ax axis, tr transform) cell {
 	if !moved {
 		return cl
 	}
-	return cell{formula: shifted, text: formulaMarker + renderExpr(shifted)}
+	// The meta clause survives a structural shift: the cell MOVED, and a name
+	// travels with its cell (SPECIFICATION §5.6) — where fill, paste, and
+	// duplication COPY, and a copy drops the clause (rebaseCell). Stripping it
+	// here would silently unname every declaration an insertRow touches.
+	return cell{formula: shifted, meta: cl.meta, text: formulaMarker + renderExpr(shifted) + renderMeta(cl.meta)}
 }
 
 // sameReference reports whether a shifted reference expression still names

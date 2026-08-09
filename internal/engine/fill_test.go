@@ -206,3 +206,67 @@ func TestCloneRowKeepsAFilledSheetFromAliasingItsSource(t *testing.T) {
 	assert.Equal(t, "7", edited.Source()[0][0], "editing the copy leaves the source row alone")
 	assert.Equal(t, "99", edited.Source()[1][0])
 }
+
+// TestNames_FillDropsTheClause is the 023 fill ruling: the expression is
+// content and fills; the clause is identity and stays with the cell it was
+// written in. The filled copy is unnamed and the original keeps the name.
+func TestNames_FillDropsTheClause(t *testing.T) {
+	t.Parallel()
+
+	s, err := engine.Parse([]byte("10\t=A1*2 |@ named(Double)\n20\t\n"))
+	require.NoError(t, err)
+
+	filled := s.Fill(engine.Address{Row: 0, Col: 1}, engine.Span{
+		From: engine.Address{Row: 1, Col: 1},
+		To:   engine.Address{Row: 1, Col: 1},
+	})
+	src := filled.Source()
+	assert.Equal(t, "=A1*2 |@ named(Double)", src[0][1], "the original keeps its name")
+	assert.Equal(t, "=A2 * 2", src[1][1], "the copy is the rebased expression, unnamed")
+}
+
+// TestNames_DuplicateRowDropsTheClause states that duplication is a copy, and
+// a copy takes the expression alone — the duplicate binds nothing, so the
+// sheet gains no duplicate-name defect from the gesture.
+func TestNames_DuplicateRowDropsTheClause(t *testing.T) {
+	t.Parallel()
+
+	s, err := engine.Parse([]byte("=1 |@ named(X)\n"))
+	require.NoError(t, err)
+
+	src := s.DuplicateRow(engine.Address{Row: 0}).Source()
+	assert.Equal(t, "=1 |@ named(X)", src[0][0])
+	assert.Equal(t, "=1", src[1][0], "the duplicate is unnamed")
+}
+
+// TestNames_PasteDropsTheClause is the paste half of the ruling (paste
+// behaves as fill does): pasted text carrying a clause lands without it.
+func TestNames_PasteDropsTheClause(t *testing.T) {
+	t.Parallel()
+
+	s, err := engine.Parse([]byte("a\tb\n"))
+	require.NoError(t, err)
+
+	pasted, err := s.Paste(engine.Address{Row: 1, Col: 0}, engine.Address{Row: 1, Col: 0},
+		engine.Grid{{"=1 |@ named(X)"}}, engine.DefaultLimits())
+	require.NoError(t, err)
+	assert.Equal(t, "=1", pasted.Source()[1][0], "the clause does not travel through a paste")
+}
+
+// TestNames_FillLeavesANameReferenceAlone states Decision 5 of the 023 design:
+// a name is absolute — there is nothing in `@Rate` for a fill to shift — so
+// the copy rebases the cell references around it and re-renders the name
+// verbatim.
+func TestNames_FillLeavesANameReferenceAlone(t *testing.T) {
+	t.Parallel()
+
+	s, err := engine.Parse([]byte("5\t=@Rate + A1\n7\t\n=2 |@ named(Rate)\n"))
+	require.NoError(t, err)
+
+	filled := s.Fill(engine.Address{Row: 0, Col: 1}, engine.Span{
+		From: engine.Address{Row: 1, Col: 1},
+		To:   engine.Address{Row: 1, Col: 1},
+	})
+	assert.Equal(t, "=@Rate + A2", filled.Source()[1][1],
+		"the cell reference shifted; the name did not")
+}
