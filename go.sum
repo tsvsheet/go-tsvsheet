@@ -1,7 +1,7 @@
 github.com/antlr4-go/antlr/v4 v4.13.1 h1:SqQKkuVZ+zWkMMNkjy5FZe5mr5WURWnlpmOuzYWrPrQ=
 github.com/antlr4-go/antlr/v4 v4.13.1/go.mod h1:GKmUxMtwp6ZgGwZSva4eWPC5mS6vUAmOABFgjdkM7Nw=
-github.com/gomatic/go-error v0.3.17 h1:/9346OvxJlUmUKZ1WlvnkHuUdEDGY8W5/k82hvFCFTM=
-github.com/gomatic/go-error v0.3.17/go.mod h1:II3waWGb3oeMWFICETR7qCRzVkkD7LaiKFlvuy3oLuQ=
+github.com/gomatic/go-error v0.3.18 h1:unisIOm6SsgB9R49KjIr7KPYEmdkhDQqS+jamr64gOQ=
+github.com/gomatic/go-error v0.3.18/go.mod h1:HnnNolwIK1o7/o5rVQiz+x6AcVweF7KMCAUyVJjzsP4=
 github.com/stretchr/testify v1.12.1 h1:EuwCh5fleGS7H32xRwO3wRGT7DxrDhLAT6FF8MpWDWE=
 github.com/stretchr/testify v1.12.1/go.mod h1:MDEgiDPPsNp5cuIrHPPCyornHKgEVbtFUmoNlxoYthg=
 github.com/tsvsheet/go-isnow v0.1.12 h1:11sxrsaVg9pJa73kRXzc7Zo358XtnqQ4utEALIDHiP4=
